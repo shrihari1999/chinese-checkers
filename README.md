@@ -2,7 +2,7 @@
 
 Virudhunagar style Chinese Checkers board game for 2-6 players on a single device.
 
-**Play now:** https://shrihari1999.github.io/chinese-checkers/
+**[Play now](https://shrihari1999.github.io/chinese-checkers/)**
 
 ## Features
 
