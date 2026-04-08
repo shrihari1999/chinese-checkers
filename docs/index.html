@@ -117,14 +117,15 @@
     width: 100%;
     max-width: 700px;
     padding: 8px 16px;
-    margin-bottom: 4px;
   }
   #turn-indicator {
     font-size: 1.15rem;
     font-weight: 600;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
+    margin-top: 32px;
   }
   #turn-indicator .dot {
     width: 16px;
@@ -141,18 +142,20 @@
     cursor: pointer;
     font-size: 0.85rem;
   }
-  #top-bar button:hover { background: #3a3a5a; }
+  #top-bar button:hover:not(:disabled) { background: #3a3a5a; }
+  #top-bar button:disabled { opacity: 0.35; cursor: default; }
 
   #canvas-wrap {
     position: relative;
     display: flex;
     justify-content: center;
+    margin-top: 24px;
   }
   canvas { display: block; }
 
   #end-turn-btn {
     display: none;
-    margin-top: 8px;
+    margin-top: 16px;
     padding: 10px 32px;
     border-radius: 10px;
     border: none;
@@ -169,7 +172,7 @@
     gap: 16px;
     flex-wrap: wrap;
     justify-content: center;
-    margin-top: 8px;
+    margin-top: 32px;
     font-size: 0.9rem;
   }
   .pbar-item {
@@ -306,17 +309,16 @@
 <!-- Game Screen -->
 <div id="game-screen">
   <div id="top-bar">
-    <div id="turn-indicator"><span class="dot"></span><span id="turn-name"></span></div>
-    <div style="display:flex;gap:8px;">
-      <button onclick="toggleHelp()">Rules</button>
-      <button onclick="restartGame()">New Game</button>
-    </div>
+    <button id="undo-btn" onclick="undoTurn()" disabled>Undo</button>
+    <button onclick="restartGame()">New Game</button>
+    <button onclick="toggleHelp()">Rules</button>
   </div>
   <div id="canvas-wrap">
     <canvas id="board"></canvas>
   </div>
   <button id="end-turn-btn" onclick="endTurn()">End Turn</button>
   <div id="players-bar"></div>
+  <div id="turn-indicator"><span class="dot"></span><span id="turn-name"></span></div>
 </div>
 
 <!-- Win Overlay -->
@@ -679,6 +681,8 @@ let selectedCount = 2;
 let finishOrder = [];
 let hoveredPos = null;      // position the mouse is over
 let invalidFlash = null;    // {row, col, time} for red flash on invalid move
+let turnSnapshot = null;    // {board, playerIdx} state at start of turn for undo
+let turnMoved = false;      // has current player made a move this turn
 
 // ============================================================
 // Setup Screen Logic
@@ -730,7 +734,30 @@ function startGame() {
   document.getElementById('game-screen').style.display = 'flex';
   document.getElementById('win-overlay').classList.remove('show');
 
+  turnMoved = false;
   resizeCanvas();
+  updateUI();
+  render();
+}
+
+function saveTurnSnapshot() {
+  turnSnapshot = { board: new Map(board), playerIdx: currentPlayerIdx };
+  turnMoved = false;
+}
+
+function undoTurn() {
+  if (!turnSnapshot) return;
+  const name = players[turnSnapshot.playerIdx].name;
+  if (!confirm(`Undo ${name}'s move?`)) return;
+  board = new Map(turnSnapshot.board);
+  currentPlayerIdx = turnSnapshot.playerIdx;
+  selectedPeg = null;
+  validMoves = new Set();
+  isHopping = false;
+  turnMoved = false;
+  turnSnapshot = null;
+  document.getElementById('undo-btn').disabled = true;
+  document.getElementById('end-turn-btn').style.display = 'none';
   updateUI();
   render();
 }
@@ -1080,7 +1107,9 @@ function advanceTurn() {
   selectedPeg = null;
   validMoves = new Set();
   isHopping = false;
+  turnMoved = false;
   document.getElementById('end-turn-btn').style.display = 'none';
+  document.getElementById('undo-btn').disabled = !turnSnapshot;
   updateUI();
   render();
 }
@@ -1140,6 +1169,13 @@ canvas.addEventListener('click', (e) => {
     validMoves = getValidMoves(pos, false);
     render();
   } else if (selectedPeg && validMoves.has(key)) {
+    // Save snapshot before first move of the turn
+    if (!turnMoved) {
+      saveTurnSnapshot();
+      turnMoved = true;
+      document.getElementById('undo-btn').disabled = false;
+    }
+
     // Move the peg
     const selKey = `${selectedPeg.row},${selectedPeg.col}`;
 
