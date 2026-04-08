@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chinese Checkers</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+  }
+
+  /* Setup Screen */
+  #setup-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 24px;
+    padding: 20px;
+  }
+  #setup-screen h1 {
+    font-size: 2.4rem;
+    color: #e0e0ff;
+    text-align: center;
+  }
+  #setup-screen h2 {
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: #aaa;
+  }
+  .player-count-btns {
+    display: flex;
+    gap: 12px;
+  }
+  .player-count-btns button {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    border: 2px solid #444;
+    background: #2a2a4a;
+    color: #ddd;
+    font-size: 1.3rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .player-count-btns button:hover { border-color: #888; background: #3a3a5a; }
+  .player-count-btns button.selected { border-color: #7b68ee; background: #3a3a6a; color: #fff; }
+
+  #player-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 300px;
+  }
+  .player-input {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .player-input .color-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .player-input input {
+    flex: 1;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: #2a2a4a;
+    color: #eee;
+    font-size: 0.95rem;
+    outline: none;
+  }
+  .player-input input:focus { border-color: #7b68ee; }
+
+  #start-btn {
+    padding: 12px 40px;
+    border-radius: 10px;
+    border: none;
+    background: #7b68ee;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #start-btn:hover { background: #6a58dd; }
+
+  /* Game Screen */
+  #game-screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh;
+    padding: 10px;
+  }
+  #top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 700px;
+    padding: 8px 16px;
+    margin-bottom: 4px;
+  }
+  #turn-indicator {
+    font-size: 1.15rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #turn-indicator .dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  #top-bar button {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: 1px solid #555;
+    background: #2a2a4a;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  #top-bar button:hover { background: #3a3a5a; }
+
+  #canvas-wrap {
+    position: relative;
+    display: flex;
+    justify-content: center;
+  }
+  canvas { display: block; }
+
+  #end-turn-btn {
+    display: none;
+    margin-top: 8px;
+    padding: 10px 32px;
+    border-radius: 10px;
+    border: none;
+    background: #e07b39;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #end-turn-btn:hover { background: #c96a2e; }
+
+  #players-bar {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+    font-size: 0.9rem;
+  }
+  .pbar-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: #2a2a4a;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+  }
+  .pbar-item.active { opacity: 1; outline: 2px solid #fff; }
+  .pbar-item.won { opacity: 0.8; }
+  .pbar-item .pdot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  /* Win overlay */
+  #win-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+  }
+  #win-overlay.show { display: flex; }
+  #win-box {
+    background: #2a2a4a;
+    border-radius: 16px;
+    padding: 40px 50px;
+    text-align: center;
+  }
+  #win-box h2 { font-size: 1.8rem; margin-bottom: 12px; }
+  #win-box p { color: #aaa; margin-bottom: 20px; }
+  #win-box button {
+    padding: 10px 32px;
+    border-radius: 10px;
+    border: none;
+    background: #7b68ee;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<!-- Setup Screen -->
+<div id="setup-screen">
+  <h1>Chinese Checkers</h1>
+  <h2>Select number of players</h2>
+  <div class="player-count-btns">
+    <button onclick="selectCount(2)" id="btn-2">2</button>
+    <button onclick="selectCount(3)" id="btn-3">3</button>
+    <button onclick="selectCount(4)" id="btn-4">4</button>
+    <button onclick="selectCount(6)" id="btn-6">6</button>
+  </div>
+  <div id="player-inputs"></div>
+  <button id="start-btn" onclick="startGame()">Start Game</button>
+</div>
+
+<!-- Game Screen -->
+<div id="game-screen">
+  <div id="top-bar">
+    <div id="turn-indicator"><span class="dot"></span><span id="turn-name"></span></div>
+    <div>
+      <button onclick="restartGame()">New Game</button>
+    </div>
+  </div>
+  <div id="canvas-wrap">
+    <canvas id="board"></canvas>
+  </div>
+  <button id="end-turn-btn" onclick="endTurn()">End Turn</button>
+  <div id="players-bar"></div>
+</div>
+
+<!-- Win Overlay -->
+<div id="win-overlay">
+  <div id="win-box">
+    <h2 id="win-title">Player Wins!</h2>
+    <p id="win-sub">Congratulations!</p>
+    <button onclick="restartGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Constants
+// ============================================================
+const COLORS = ['#e84855','#3185fc','#44c767','#f5a623','#a855f7','#22d3ee'];
+const COLOR_NAMES = ['Red','Blue','Green','Orange','Purple','Cyan'];
+const DIRECTIONS = [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[-1,1]];
+// Directions in (x, y) coordinate space for long hops
+const XY_DIRS = [[1, 0], [-1, 0], [0.5, 1], [-0.5, 1], [0.5, -1], [-0.5, -1]];
+
+// Which triangles each player count uses (triangle indices 0-5 clockwise from top)
+const PLAYER_CONFIGS = {
+  2: [0, 3],
+  3: [0, 2, 4],
+  4: [0, 1, 3, 4],
+  6: [0, 1, 2, 3, 4, 5]
+};
+
+// ============================================================
+// Board Generation
+// ============================================================
+
+// We define the board using the classic row structure.
+// Row index 0 = top of star, row 16 = bottom.
+// Each entry: [rowLength, qStart] where qStart positions the row in axial q.
+// We use axial coordinates with r = row - 8 (center row 8 has r=0).
+// For the triangular grid, in odd-offset rows q shifts by 0.5, but we use
+// axial coords where hex_to_pixel handles staggering.
+
+// The star-shaped board row by row. Each row has a length and a starting q offset.
+// We'll generate positions such that the board is symmetric.
+
+// Actually, let's use a different, cleaner approach: define the board as a set of
+// (row, col) positions on a triangular grid, then convert to axial.
+// The board has 17 rows. We number positions within each row from 0.
+
+const ROW_DEFS = [
+  // [length, rowIndex]  — rowIndex is the visual row from top (0-16)
+  // Top triangle (rows 0-3)
+  { len: 1,  row: 0 },
+  { len: 2,  row: 1 },
+  { len: 3,  row: 2 },
+  { len: 4,  row: 3 },
+  // Central band (rows 4-12)
+  { len: 13, row: 4 },
+  { len: 12, row: 5 },
+  { len: 11, row: 6 },
+  { len: 10, row: 7 },
+  { len: 9,  row: 8 },
+  { len: 10, row: 9 },
+  { len: 11, row: 10 },
+  { len: 12, row: 11 },
+  { len: 13, row: 12 },
+  // Bottom triangle (rows 13-16)
+  { len: 4,  row: 13 },
+  { len: 3,  row: 14 },
+  { len: 2,  row: 15 },
+  { len: 1,  row: 16 },
+];
+
+// We store positions as {row, col} in a flat grid, using (row, col) as the key.
+// For adjacency on a triangular grid with staggered rows:
+// Even rows and odd rows stagger differently.
+// But Chinese Checkers uses a triangular lattice, not a hex grid per se.
+// The simplest approach: use (row, col) and define 6 neighbors based on row parity.
+
+// Actually, for a star board, the connectivity is simpler if we think of it as:
+// each cell connects to its left/right neighbor in the same row, and to cells
+// in the rows above and below. The staggering depends on whether the next row
+// is wider or narrower.
+
+// Let me use a more direct approach: offset-based coordinates.
+// For each row, we define a "center offset" so that cells are visually centered.
+// Two cells are adjacent if they are in the same row and differ by 1 in col,
+// or in adjacent rows and their visual positions overlap.
+
+// Let's assign each cell a fractional x-position for adjacency:
+// xPos = col - (len - 1) / 2
+// This centers each row at x=0. Two cells in adjacent rows are vertically adjacent
+// if their xPos values differ by ±0.5.
+
+// But we need to be careful about the direction of stagger in different parts of the board.
+// In the top triangle (rows 0-3), each row is 1 wider than the previous, expanding to the left.
+// In the center band, rows 4-8 shrink by 1 each, rows 8-12 grow by 1 each.
+
+// Let me define exact fractional x-positions for each row.
+
+// Visual layout: each cell is a circle on a triangular grid.
+// Vertical spacing between rows: sqrt(3)/2 * cellSize
+// Horizontal spacing: cellSize
+// Stagger: each row is offset by 0.5 * cellSize from adjacent rows.
+
+// For correct staggering, let's define the leftmost x-position of each row:
+
+function buildBoard() {
+  const positions = [];
+  const triangles = [[], [], [], [], [], []]; // 6 triangles of 10 positions each
+
+  // We define the x-offset (in half-units) for each row's first cell.
+  // The board center is at row 8. We want the board symmetric around x=0.
+  // Each cell occupies 1 unit of horizontal space.
+  // Adjacent rows are staggered by 0.5 units.
+
+  // Let's define xStart for each row so that the row is centered at x = 0.
+  // xStart = -(len - 1) / 2
+  // Then cell j in row i has x = xStart + j
+
+  // But we also need to handle the stagger between the triangles and the center band.
+  // The key insight: in the top triangle, row 0 has 1 cell, row 1 has 2 cells.
+  // Row 0's cell is centered. Row 1's cells should be at -0.5 and +0.5.
+  // Row 2: -1, 0, 1. Row 3: -1.5, -0.5, 0.5, 1.5.
+  // Row 4 (center band, len 13): center band starts. It should connect to row 3.
+  // Row 3 has cells at -1.5, -0.5, 0.5, 1.5
+  // Row 4 has 13 cells. These connect to row 3 and also extend to the side triangles.
+  // Row 4 should be at -6, -5, -4, ..., 5, 6
+
+  // Let me think about this differently. The center band (rows 4-12) forms a hexagon.
+  // Row 8 (center) has 9 cells: positions -4 to +4
+  // Row 7: 10 cells, -4.5 to +4.5
+  // Row 6: 11 cells, -5 to +5
+  // Row 5: 12 cells, -5.5 to +5.5
+  // Row 4: 13 cells, -6 to +6
+  // Row 9: 10 cells, -4.5 to +4.5
+  // Row 10: 11 cells, -5 to +5
+  // Row 11: 12 cells, -5.5 to +5.5
+  // Row 12: 13 cells, -6 to +6
+
+  // Top triangle:
+  // Row 3: 4 cells. These must connect to row 4.
+  // Row 4 center 4 cells are at positions ... we need row 3 to stagger with row 4.
+  // If row 4 goes -6, -5, ..., 6 (integer positions)
+  // Then row 3 should go -1.5, -0.5, 0.5, 1.5 (half-integer)
+  // Row 2: -1, 0, 1 (integer)
+  // Row 1: -0.5, 0.5 (half-integer)
+  // Row 0: 0 (integer)
+
+  // Bottom triangle (symmetric):
+  // Row 13: 4 cells at -1.5, -0.5, 0.5, 1.5
+  // Row 14: 3 cells at -1, 0, 1
+  // Row 15: 2 cells at -0.5, 0.5
+  // Row 16: 1 cell at 0
+
+  // For the center band, checking row 4 (-6..6 integers) and row 5:
+  // Row 5 has 12 cells at -5.5, -4.5, ..., 5.5 (half-integers). Good, stagger works.
+
+  // So the x-position of cell j in row i is:
+  // x(i, j) = -(len-1)/2 + j
+
+  // This gives us the staggering pattern above. Let's verify adjacency:
+  // Row 4, cell at x=-6 should connect to row 5, cells at x=-5.5 and x=-6.5.
+  // Row 5 goes from -5.5 to 5.5, so no -6.5. So x=-6 only connects down to -5.5. Good, this is the left edge of the hex.
+
+  // Now let's identify the 6 triangles:
+  // Triangle 0 (top): rows 0-3 (all cells)
+  // Triangle 3 (bottom): rows 13-16 (all cells)
+  // Triangles 1,2,4,5 (side triangles): these are in the center band rows.
+  // The center hexagon (rows 4-12) has a hex shape. The 4 side triangles
+  // extend beyond the hex at the corners.
+
+  // The center hexagon has rows 4-12. The hex interior at row 4 has 9 cells
+  // (matching the narrowest row 8). But row 4 has 13 cells. The extra 4 cells
+  // (2 on each side) are part of the side triangles... wait, that's only 2 extra
+  // on each side at row 4, growing to 0 at row 8.
+
+  // Actually at row 4 (len 13), the hex interior would be 9 cells wide (same as row 8 but offset).
+  // Wait, the hex interior has varying width. Let me reconsider.
+
+  // The hexagonal body = 61 cells. Rows 4-12, but trimmed to a hexagonal shape.
+  // Row 4: 13 cells total. How many are in the hex body?
+  // The hex body at row 4: should be len 9 (same width as row 8, the center).
+  // No wait - a regular hexagon centered at row 8 would have:
+  // row 8: 9, row 7&9: 9, row 6&10: 9, row 5&11: 9, row 4&12: 9
+  // That gives 9*9 = 81 which is too many.
+
+  // Actually in a hex grid, a hexagon of radius 4 has concentric rings.
+  // Let me just use the simpler approach: the hex body is NOT a neat hex —
+  // the "star" is defined exactly by those 17 row lengths, and the 6 triangles
+  // are the 6 tips. The remaining 61 cells are the center.
+
+  // The 4 side triangles (upper-right, lower-right, lower-left, upper-left) are:
+  // Upper-right triangle (tri 1): at the right side of rows 4-7
+  //   Row 4: rightmost 4 cells (x = 3.5, 4.5, 5.5, 6) wait, integers: 3,4,5,6
+  //   Row 5: rightmost 3 cells
+  //   Row 6: rightmost 2 cells
+  //   Row 7: rightmost 1 cell
+  //   Total: 4+3+2+1 = 10 ✓
+
+  // Lower-right triangle (tri 2): at the right side of rows 9-12
+  //   Row 9: rightmost 1 cell
+  //   Row 10: rightmost 2 cells
+  //   Row 11: rightmost 3 cells
+  //   Row 12: rightmost 4 cells
+  //   Total: 10 ✓
+
+  // Lower-left triangle (tri 4): at the left side of rows 9-12
+  //   Row 9: leftmost 1 cell
+  //   Row 10: leftmost 2 cells
+  //   Row 11: leftmost 3 cells
+  //   Row 12: leftmost 4 cells
+  //   Total: 10 ✓
+
+  // Upper-left triangle (tri 5): at the left side of rows 4-7
+  //   Row 4: leftmost 4 cells
+  //   Row 5: leftmost 3 cells
+  //   Row 6: leftmost 2 cells
+  //   Row 7: leftmost 1 cell
+  //   Total: 10 ✓
+
+  const rowLens = [1,2,3,4, 13,12,11,10,9,10,11,12,13, 4,3,2,1];
+  const rowXStarts = rowLens.map(len => -(len - 1) / 2);
+
+  // Build all positions
+  for (let r = 0; r < 17; r++) {
+    const len = rowLens[r];
+    const xs = rowXStarts[r];
+    for (let c = 0; c < len; c++) {
+      const x = xs + c;
+      const pos = { row: r, col: c, x: x, y: r };
+      positions.push(pos);
+
+      // Classify into triangles
+      if (r <= 3) {
+        // Top triangle (tri 0)
+        triangles[0].push(pos);
+      } else if (r >= 13) {
+        // Bottom triangle (tri 3)
+        triangles[3].push(pos);
+      } else if (r >= 4 && r <= 7) {
+        // Check upper-right (tri 1) and upper-left (tri 5)
+        // The hex body at this row has width: 9 + (8 - r) ... let me think differently.
+        // At row 4, center band len=13. The hex body center portion = 13 - 4 - 4 = 5? No.
+        // The side triangles have 4-r+4 cells at row r (for rows 4-7) on each side:
+        // Row 4: 4 cells each side, Row 5: 3, Row 6: 2, Row 7: 1
+        const sideCount = 4 - (r - 4); // 4,3,2,1
+        if (c < sideCount) {
+          triangles[5].push(pos); // upper-left
+        } else if (c >= len - sideCount) {
+          triangles[1].push(pos); // upper-right
+        }
+      } else if (r >= 9 && r <= 12) {
+        // Check lower-right (tri 2) and lower-left (tri 4)
+        const sideCount = r - 8; // 1,2,3,4
+        if (c < sideCount) {
+          triangles[4].push(pos); // lower-left
+        } else if (c >= len - sideCount) {
+          triangles[2].push(pos); // lower-right
+        }
+      }
+    }
+  }
+
+  return { positions, triangles, rowLens, rowXStarts };
+}
+
+// Build adjacency map
+function buildAdjacency(positions, rowLens, rowXStarts) {
+  // Key: "row,col" -> list of {row, col} neighbors
+  const adj = new Map();
+  const posSet = new Map(); // "x,y" -> {row, col, x, y}
+
+  // Index positions by their (x, y) for fast lookup
+  for (const p of positions) {
+    posSet.set(`${p.x},${p.y}`, p);
+  }
+
+  for (const p of positions) {
+    const key = `${p.row},${p.col}`;
+    const neighbors = [];
+
+    // Same row: left and right
+    const left = posSet.get(`${p.x - 1},${p.y}`);
+    const right = posSet.get(`${p.x + 1},${p.y}`);
+    if (left) neighbors.push(left);
+    if (right) neighbors.push(right);
+
+    // Adjacent rows: above (y-1) and below (y+1), at x ± 0.5
+    for (const dy of [-1, 1]) {
+      const ny = p.y + dy;
+      for (const dx of [-0.5, 0.5]) {
+        const nx = p.x + dx;
+        const neighbor = posSet.get(`${nx},${ny}`);
+        if (neighbor) neighbors.push(neighbor);
+      }
+    }
+
+    adj.set(key, neighbors);
+  }
+
+  return { adj, posSet };
+}
+
+// ============================================================
+// Game State
+// ============================================================
+let boardData = null; // { positions, triangles, rowLens, rowXStarts }
+let adjData = null;   // { adj, posSet }
+let board = new Map(); // "row,col" -> null | playerIndex
+let players = [];      // [{name, color, triangleIndex, goalTriangleIndex, finished}]
+let currentPlayerIdx = 0;
+let selectedPeg = null;
+let validMoves = new Set();
+let isHopping = false; // true if mid-chain-hop
+let hopOrigin = null;  // where the hop chain started (to allow undo)
+let gameOver = false;
+let selectedCount = 2;
+let finishOrder = [];
+let hoveredPos = null;      // position the mouse is over
+let invalidFlash = null;    // {row, col, time} for red flash on invalid move
+
+// ============================================================
+// Setup Screen Logic
+// ============================================================
+function selectCount(n) {
+  selectedCount = n;
+  document.querySelectorAll('.player-count-btns button').forEach(b => b.classList.remove('selected'));
+  document.getElementById(`btn-${n}`).classList.add('selected');
+
+  const triIndices = PLAYER_CONFIGS[n];
+  const container = document.getElementById('player-inputs');
+  container.innerHTML = '';
+  triIndices.forEach((tri, i) => {
+    const div = document.createElement('div');
+    div.className = 'player-input';
+    div.innerHTML = `<span class="color-dot" style="background:${COLORS[tri]}"></span>
+      <input type="text" placeholder="Player ${i + 1}" id="pname-${i}" maxlength="20">`;
+    container.appendChild(div);
+  });
+}
+
+function startGame() {
+  const triIndices = PLAYER_CONFIGS[selectedCount];
+  players = triIndices.map((tri, i) => {
+    const input = document.getElementById(`pname-${i}`);
+    const name = (input && input.value.trim()) || `Player ${i + 1}`;
+    return {
+      name,
+      color: COLORS[tri],
+      colorName: COLOR_NAMES[tri],
+      triangleIndex: tri,
+      goalTriangleIndex: (tri + 3) % 6,
+      finished: false,
+      finishPlace: -1
+    };
+  });
+
+  boardData = buildBoard();
+  adjData = buildAdjacency(boardData.positions, boardData.rowLens, boardData.rowXStarts);
+  initBoard();
+  currentPlayerIdx = 0;
+  selectedPeg = null;
+  validMoves = new Set();
+  isHopping = false;
+  gameOver = false;
+  finishOrder = [];
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'flex';
+  document.getElementById('win-overlay').classList.remove('show');
+
+  resizeCanvas();
+  updateUI();
+  render();
+}
+
+function restartGame() {
+  document.getElementById('game-screen').style.display = 'none';
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('setup-screen').style.display = 'flex';
+}
+
+function initBoard() {
+  board = new Map();
+  for (const p of boardData.positions) {
+    board.set(`${p.row},${p.col}`, null);
+  }
+  // Place pegs
+  players.forEach((player, pi) => {
+    const tri = boardData.triangles[player.triangleIndex];
+    for (const pos of tri) {
+      board.set(`${pos.row},${pos.col}`, pi);
+    }
+  });
+}
+
+// ============================================================
+// Canvas & Rendering
+// ============================================================
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+let cellSize = 24;
+let offsetX = 0, offsetY = 0;
+
+function resizeCanvas() {
+  const maxW = Math.min(window.innerWidth - 20, 700);
+  const maxH = Math.min(window.innerHeight - 200, 700);
+  // Board spans x from -6 to 6 (13 units) and y from 0 to 16 (17 rows)
+  // with vertical spacing of sqrt(3)/2 * cellSize and horizontal of cellSize
+  const desiredW = 14 * 1; // 14 units wide
+  const desiredH = 16 * (Math.sqrt(3) / 2); // ~13.86 units tall
+
+  cellSize = Math.min(maxW / (desiredW + 2), maxH / (desiredH + 2));
+  cellSize = Math.max(cellSize, 12);
+  cellSize = Math.min(cellSize, 32);
+
+  const cw = (desiredW + 2) * cellSize;
+  const ch = (desiredH + 2) * cellSize;
+  canvas.width = cw * (window.devicePixelRatio || 1);
+  canvas.height = ch * (window.devicePixelRatio || 1);
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+
+  offsetX = cw / 2;
+  offsetY = cellSize * 1.2;
+}
+
+function posToPixel(pos) {
+  const px = offsetX + pos.x * cellSize;
+  const py = offsetY + pos.y * cellSize * (Math.sqrt(3) / 2);
+  return { px, py };
+}
+
+function pixelToPos(mx, my) {
+  let closest = null;
+  let minDist = Infinity;
+  for (const p of boardData.positions) {
+    const { px, py } = posToPixel(p);
+    const d = (mx - px) ** 2 + (my - py) ** 2;
+    if (d < minDist) {
+      minDist = d;
+      closest = p;
+    }
+  }
+  if (minDist < (cellSize * 0.7) ** 2) return closest;
+  return null;
+}
+
+function render() {
+  const w = canvas.width / (window.devicePixelRatio || 1);
+  const h = canvas.height / (window.devicePixelRatio || 1);
+  ctx.clearRect(0, 0, w, h);
+
+  const r = cellSize * 0.38;
+
+  // Draw board positions
+  for (const pos of boardData.positions) {
+    const { px, py } = posToPixel(pos);
+    const key = `${pos.row},${pos.col}`;
+    const occupant = board.get(key);
+
+    // Determine if this is a triangle position and which color to tint
+    let bgColor = '#333';
+    for (let t = 0; t < 6; t++) {
+      if (boardData.triangles[t].some(p => p.row === pos.row && p.col === pos.col)) {
+        // Light tint of triangle color
+        bgColor = hexToRgba(COLORS[t], 0.15);
+        break;
+      }
+    }
+
+    // Draw cell background
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fillStyle = bgColor;
+    ctx.fill();
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Hover highlight
+    const isHovered = hoveredPos && hoveredPos.row === pos.row && hoveredPos.col === pos.col;
+    if (isHovered && selectedPeg) {
+      if (occupant === null) {
+        // Empty cell hover: subtle neutral highlight
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(200, 200, 220, 0.15)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(px, py, r + 1, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(200, 200, 220, 0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else if (occupant !== currentPlayerIdx) {
+        // Occupied cell hover: X mark
+        const xr = r * 0.45;
+        ctx.strokeStyle = 'rgba(255, 80, 80, 0.6)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(px - xr, py - xr);
+        ctx.lineTo(px + xr, py + xr);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(px + xr, py - xr);
+        ctx.lineTo(px - xr, py + xr);
+        ctx.stroke();
+      }
+    }
+
+    // Invalid move flash (red)
+    if (invalidFlash && invalidFlash.row === pos.row && invalidFlash.col === pos.col) {
+      const elapsed = Date.now() - invalidFlash.time;
+      if (elapsed < 400) {
+        const alpha = 0.5 * (1 - elapsed / 400);
+        ctx.beginPath();
+        ctx.arc(px, py, r + 3, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 60, 60, ${alpha})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(px, py, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 60, 60, ${alpha * 0.5})`;
+        ctx.fill();
+      }
+    }
+
+    // Draw peg
+    if (occupant !== null) {
+      const color = players[occupant].color;
+      const isSelected = selectedPeg && selectedPeg.row === pos.row && selectedPeg.col === pos.col;
+
+      if (isSelected) {
+        // Glow
+        ctx.beginPath();
+        ctx.arc(px, py, r + 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fill();
+      }
+
+      // Peg body
+      ctx.beginPath();
+      ctx.arc(px, py, r - 1, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(px - r * 0.3, py - r * 0.3, r * 0.1, px, py, r);
+      grad.addColorStop(0, lightenColor(color, 40));
+      grad.addColorStop(1, color);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.strokeStyle = darkenColor(color, 30);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function lightenColor(hex, amt) {
+  let r = parseInt(hex.slice(1, 3), 16);
+  let g = parseInt(hex.slice(3, 5), 16);
+  let b = parseInt(hex.slice(5, 7), 16);
+  r = Math.min(255, r + amt);
+  g = Math.min(255, g + amt);
+  b = Math.min(255, b + amt);
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+function darkenColor(hex, amt) {
+  let r = parseInt(hex.slice(1, 3), 16);
+  let g = parseInt(hex.slice(3, 5), 16);
+  let b = parseInt(hex.slice(5, 7), 16);
+  r = Math.max(0, r - amt);
+  g = Math.max(0, g - amt);
+  b = Math.max(0, b - amt);
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
+// ============================================================
+// Move Logic
+// ============================================================
+function getValidMoves(pos, hopsOnly) {
+  const moves = new Set();
+  const key = `${pos.row},${pos.col}`;
+  const neighbors = adjData.adj.get(key) || [];
+
+  if (!hopsOnly) {
+    // Single steps to adjacent empty cells
+    for (const n of neighbors) {
+      const nk = `${n.row},${n.col}`;
+      if (board.get(nk) === null) {
+        moves.add(nk);
+      }
+    }
+  }
+
+  // Hops — supports both standard and long hops
+  // Standard hop: peg is adjacent, land on the empty cell directly opposite.
+  // Long hop: N empty spaces, then a peg, then exactly N empty spaces — land on the Nth.
+  // (Standard hop is the N=0 case of long hop.)
+  //
+  // When hopsOnly=false (first move of turn): BFS to find all chain-reachable hop destinations.
+  // When hopsOnly=true (mid-chain): only find immediate hops from current position
+  //   (the click handler manages the chain step-by-step).
+  const visited = new Set();
+  visited.add(key);
+  const queue = [pos];
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+
+    for (const [dx, dy] of XY_DIRS) {
+      // Scan along this direction from cur
+      let cx = cur.x, cy = cur.y;
+
+      // Phase 1: count empty spaces before hitting a peg
+      let gapBefore = 0;
+      let foundPeg = false;
+      while (true) {
+        cx += dx;
+        cy += dy;
+        const cell = adjData.posSet.get(`${cx},${cy}`);
+        if (!cell) break; // off the board
+        const occupant = board.get(`${cell.row},${cell.col}`);
+        if (occupant !== null) {
+          foundPeg = true;
+          break;
+        }
+        gapBefore++;
+      }
+
+      if (!foundPeg) continue;
+
+      // Phase 2: N gaps before peg → leave N gaps after peg, then land.
+      // So we need gapBefore + 1 consecutive empty cells after the peg,
+      // landing on the last one. (Standard hop is the N=0 case: 1 empty cell.)
+      const needed = gapBefore + 1;
+      let emptyCount = 0;
+      let landPos = null;
+      while (emptyCount < needed) {
+        cx += dx;
+        cy += dy;
+        const cell = adjData.posSet.get(`${cx},${cy}`);
+        if (!cell) break;
+        if (board.get(`${cell.row},${cell.col}`) !== null) break;
+        emptyCount++;
+        if (emptyCount === needed) {
+          landPos = cell;
+        }
+      }
+
+      if (!landPos) continue;
+      const landKey = `${landPos.row},${landPos.col}`;
+      if (visited.has(landKey)) continue;
+
+      visited.add(landKey);
+      moves.add(landKey);
+      // Only chain (BFS) when showing all reachable destinations on first move
+      // During mid-chain (hopsOnly), don't queue — just show immediate hops
+      if (!hopsOnly) {
+        queue.push(landPos);
+      }
+    }
+  }
+
+  // Filter: don't allow moving back into own home triangle once left
+  // (unless the move stays within home), and don't leave goal triangle once entered
+  const playerIdx = currentPlayerIdx;
+  const player = players[playerIdx];
+  const homeTriKeys = new Set(boardData.triangles[player.triangleIndex].map(p => `${p.row},${p.col}`));
+  const goalTriKeys = new Set(boardData.triangles[player.goalTriangleIndex].map(p => `${p.row},${p.col}`));
+  const pegInHome = homeTriKeys.has(key);
+  const pegInGoal = goalTriKeys.has(key);
+
+  const filtered = new Set();
+  for (const mk of moves) {
+    // If peg is in goal triangle, it can't leave
+    if (pegInGoal && !goalTriKeys.has(mk)) continue;
+    // If peg has left home, it can't re-enter home
+    if (!pegInHome && homeTriKeys.has(mk)) continue;
+    filtered.add(mk);
+  }
+
+  return filtered;
+}
+
+function checkWin(playerIdx) {
+  const player = players[playerIdx];
+  const goalTri = boardData.triangles[player.goalTriangleIndex];
+  return goalTri.every(pos => board.get(`${pos.row},${pos.col}`) === playerIdx);
+}
+
+function advanceTurn() {
+  // Check win for current player
+  if (checkWin(currentPlayerIdx)) {
+    players[currentPlayerIdx].finished = true;
+    finishOrder.push(currentPlayerIdx);
+    players[currentPlayerIdx].finishPlace = finishOrder.length;
+
+    // Check if game is over (all but one finished)
+    const unfinished = players.filter(p => !p.finished);
+    if (unfinished.length <= 1) {
+      gameOver = true;
+      showWinScreen();
+      return;
+    }
+  }
+
+  // Move to next unfinished player
+  do {
+    currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
+  } while (players[currentPlayerIdx].finished);
+
+  selectedPeg = null;
+  validMoves = new Set();
+  isHopping = false;
+  document.getElementById('end-turn-btn').style.display = 'none';
+  updateUI();
+  render();
+}
+
+function endTurn() {
+  if (isHopping) {
+    isHopping = false;
+    advanceTurn();
+  }
+}
+
+// ============================================================
+// Input Handling
+// ============================================================
+canvas.addEventListener('click', (e) => {
+  if (gameOver) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const pos = pixelToPos(mx, my);
+  if (!pos) return;
+
+  const key = `${pos.row},${pos.col}`;
+  const occupant = board.get(key);
+
+  if (isHopping) {
+    // Mid-chain: can only click valid hop destinations or end turn
+    if (validMoves.has(key)) {
+      // Execute hop
+      const selKey = `${selectedPeg.row},${selectedPeg.col}`;
+      board.set(selKey, null);
+      board.set(key, currentPlayerIdx);
+      selectedPeg = pos;
+
+      // Check for more hops
+      const nextMoves = getValidMoves(pos, true);
+      if (nextMoves.size > 0) {
+        validMoves = nextMoves;
+        render();
+      } else {
+        // No more hops, auto-end turn
+        validMoves = new Set();
+        render();
+        setTimeout(() => advanceTurn(), 200);
+      }
+    } else {
+      // Invalid hop destination — show red flash
+      showInvalidFlash(pos);
+    }
+    return;
+  }
+
+  if (occupant === currentPlayerIdx) {
+    // Select this peg
+    selectedPeg = pos;
+    validMoves = getValidMoves(pos, false);
+    render();
+  } else if (selectedPeg && validMoves.has(key)) {
+    // Move the peg
+    const selKey = `${selectedPeg.row},${selectedPeg.col}`;
+
+    // Determine if this was a hop (distance > 1 step)
+    const neighbors = adjData.adj.get(selKey) || [];
+    const isStep = neighbors.some(n => n.row === pos.row && n.col === pos.col);
+
+    board.set(selKey, null);
+    board.set(key, currentPlayerIdx);
+
+    if (isStep) {
+      // Single step: turn ends
+      selectedPeg = null;
+      validMoves = new Set();
+      render();
+      setTimeout(() => advanceTurn(), 200);
+    } else {
+      // Hop: check for chain
+      selectedPeg = pos;
+      const nextMoves = getValidMoves(pos, true);
+      if (nextMoves.size > 0) {
+        isHopping = true;
+        validMoves = nextMoves;
+        document.getElementById('end-turn-btn').style.display = 'block';
+        render();
+      } else {
+        selectedPeg = null;
+        validMoves = new Set();
+        render();
+        setTimeout(() => advanceTurn(), 200);
+      }
+    }
+  } else {
+    // Invalid move or deselect
+    if (selectedPeg && occupant !== currentPlayerIdx) {
+      // Clicked an invalid destination — show red flash
+      showInvalidFlash(pos);
+    } else {
+      // Clicked empty with no selection, or non-current peg — deselect
+      selectedPeg = null;
+      validMoves = new Set();
+      render();
+    }
+  }
+});
+
+// Mousemove for hover
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const pos = pixelToPos(mx, my);
+  const prev = hoveredPos;
+  hoveredPos = pos;
+  // Only re-render if hovered cell changed
+  if ((!prev && pos) || (prev && !pos) ||
+      (prev && pos && (prev.row !== pos.row || prev.col !== pos.col))) {
+    render();
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredPos = null;
+  render();
+});
+
+function showInvalidFlash(pos) {
+  invalidFlash = { row: pos.row, col: pos.col, time: Date.now() };
+  render();
+  // Animate the flash fading out
+  let frame;
+  const animate = () => {
+    if (!invalidFlash) return;
+    if (Date.now() - invalidFlash.time >= 400) {
+      invalidFlash = null;
+      render();
+      return;
+    }
+    render();
+    frame = requestAnimationFrame(animate);
+  };
+  frame = requestAnimationFrame(animate);
+}
+
+// ============================================================
+// UI Updates
+// ============================================================
+function updateUI() {
+  const player = players[currentPlayerIdx];
+  const dot = document.querySelector('#turn-indicator .dot');
+  dot.style.background = player.color;
+  document.getElementById('turn-name').textContent = `${player.name}'s turn`;
+
+  // Players bar
+  const bar = document.getElementById('players-bar');
+  bar.innerHTML = '';
+  players.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'pbar-item' + (i === currentPlayerIdx ? ' active' : '') + (p.finished ? ' won' : '');
+    div.innerHTML = `<span class="pdot" style="background:${p.color}"></span>
+      <span>${p.name}${p.finished ? ' ✓' : ''}</span>`;
+    bar.appendChild(div);
+  });
+}
+
+function showWinScreen() {
+  const overlay = document.getElementById('win-overlay');
+  overlay.classList.add('show');
+  const winner = players[finishOrder[0]];
+  document.getElementById('win-title').textContent = `${winner.name} Wins!`;
+  if (finishOrder.length > 1) {
+    const order = finishOrder.map((pi, i) => `${i + 1}. ${players[pi].name}`).join(', ');
+    document.getElementById('win-sub').textContent = `Final order: ${order}`;
+  } else {
+    document.getElementById('win-sub').textContent = 'Congratulations!';
+  }
+}
+
+// ============================================================
+// Init
+// ============================================================
+window.addEventListener('resize', () => {
+  if (document.getElementById('game-screen').style.display !== 'none') {
+    resizeCanvas();
+    render();
+  }
+});
+
+selectCount(2);
+</script>
+</body>
+</html>
