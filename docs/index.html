@@ -7,6 +7,7 @@
 <title>Chinese Checkers</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="manifest" href="manifest.webmanifest">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -40,6 +41,25 @@
     font-weight: 400;
     color: #aaa;
   }
+
+  .mode-btns {
+    display: flex;
+    gap: 12px;
+  }
+  .mode-btns button {
+    padding: 10px 24px;
+    border-radius: 10px;
+    border: 2px solid #444;
+    background: #2a2a4a;
+    color: #ddd;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-btns button:hover { border-color: #888; background: #3a3a5a; }
+  .mode-btns button.selected { border-color: #7b68ee; background: #3a3a6a; color: #fff; }
+
   .player-count-btns {
     display: flex;
     gap: 12px;
@@ -100,6 +120,138 @@
     transition: background 0.15s;
   }
   #start-btn:hover { background: #6a58dd; }
+  #start-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .setup-btn {
+    padding: 8px 24px;
+    border-radius: 8px;
+    border: 1px solid #555;
+    background: #2a2a4a;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .setup-btn:hover { background: #3a3a5a; }
+
+  /* Online panels */
+  #online-panel {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 320px;
+  }
+  .online-choice-btns {
+    display: flex;
+    gap: 12px;
+  }
+  .online-choice-btns button {
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 2px solid #444;
+    background: #2a2a4a;
+    color: #ddd;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .online-choice-btns button:hover { border-color: #888; background: #3a3a5a; }
+  .online-choice-btns button.selected { border-color: #7b68ee; background: #3a3a6a; color: #fff; }
+
+  .online-sub-panel {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 16px;
+    background: #222244;
+    border-radius: 12px;
+  }
+  .online-sub-panel.show { display: flex; }
+
+  .room-code-display {
+    font-size: 2rem;
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: #7b68ee;
+    font-family: monospace;
+    cursor: pointer;
+    position: relative;
+  }
+  .room-code-display:hover { color: #9b88ff; }
+  .copy-toast {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 10px;
+    font-size: 0.75rem;
+    color: #44c767;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    letter-spacing: normal;
+    font-weight: 400;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  .copy-toast.show { opacity: 1; }
+  .status-text {
+    font-size: 0.9rem;
+    color: #aaa;
+  }
+  .lobby-players {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .lobby-slot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #2a2a4a;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+  .lobby-slot .ldot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+  }
+  .lobby-slot.empty { opacity: 0.4; }
+
+  #join-room-input, #join-name-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    background: #2a2a4a;
+    color: #eee;
+    font-size: 1rem;
+    outline: none;
+    text-align: center;
+  }
+  #join-room-input { letter-spacing: 4px; font-family: monospace; font-size: 1.2rem; text-transform: uppercase; }
+  #join-room-input:focus, #join-name-input:focus { border-color: #7b68ee; }
+
+  .join-btn {
+    padding: 10px 32px;
+    border-radius: 10px;
+    border: none;
+    background: #7b68ee;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .join-btn:hover { background: #6a58dd; }
+  .join-btn:disabled { opacity: 0.4; cursor: default; }
+
+  .error-text { color: #e84855; font-size: 0.85rem; }
+  .success-text { color: #44c767; font-size: 0.85rem; }
 
   /* Game Screen */
   #game-screen {
@@ -187,6 +339,7 @@
   }
   .pbar-item.active { opacity: 1; outline: 2px solid #fff; }
   .pbar-item.won { opacity: 0.8; }
+  .pbar-item.me { border: 1px solid #7b68ee; }
   .pbar-item .pdot {
     width: 12px;
     height: 12px;
@@ -287,6 +440,36 @@
     margin: 6px 0 10px;
     line-height: 1.6;
   }
+
+  /* Disconnect overlay */
+  #disconnect-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+  }
+  #disconnect-overlay.show { display: flex; }
+  #disconnect-box {
+    background: #2a2a4a;
+    border-radius: 16px;
+    padding: 40px 50px;
+    text-align: center;
+  }
+  #disconnect-box h2 { font-size: 1.4rem; margin-bottom: 12px; color: #e84855; }
+  #disconnect-box p { color: #aaa; margin-bottom: 20px; }
+  #disconnect-box button {
+    padding: 10px 32px;
+    border-radius: 10px;
+    border: none;
+    background: #7b68ee;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -294,23 +477,76 @@
 <!-- Setup Screen -->
 <div id="setup-screen">
   <h1>Chinese Checkers</h1>
-  <h2>Select number of players</h2>
-  <div class="player-count-btns">
-    <button onclick="selectCount(2)" id="btn-2">2</button>
-    <button onclick="selectCount(3)" id="btn-3">3</button>
-    <button onclick="selectCount(4)" id="btn-4">4</button>
-    <button onclick="selectCount(6)" id="btn-6">6</button>
+
+  <div class="mode-btns">
+    <button id="btn-local" class="selected" onclick="selectMode('local')">Local Game</button>
+    <button id="btn-online" onclick="selectMode('online')">Online Game</button>
   </div>
-  <div id="player-inputs"></div>
+
+  <!-- Local mode controls -->
+  <div id="local-panel">
+    <h2 style="text-align:center;margin-bottom:16px;">Select number of players</h2>
+    <div class="player-count-btns" style="justify-content:center;display:flex;">
+      <button onclick="selectCount(2)" id="btn-2">2</button>
+      <button onclick="selectCount(3)" id="btn-3">3</button>
+      <button onclick="selectCount(4)" id="btn-4">4</button>
+      <button onclick="selectCount(6)" id="btn-6">6</button>
+    </div>
+    <div id="player-inputs" style="margin-top:16px;"></div>
+  </div>
+
+  <!-- Online mode controls -->
+  <div id="online-panel">
+    <div class="online-choice-btns">
+      <button id="btn-create" onclick="showCreateRoom()">Create Room</button>
+      <button id="btn-join" onclick="showJoinRoom()">Join Room</button>
+    </div>
+
+    <!-- Create room panel -->
+    <div id="create-room-panel" class="online-sub-panel">
+      <p class="status-text">Select number of players</p>
+      <div class="player-count-btns">
+        <button onclick="hostSelectCount(2)" id="hbtn-2">2</button>
+        <button onclick="hostSelectCount(3)" id="hbtn-3">3</button>
+        <button onclick="hostSelectCount(4)" id="hbtn-4">4</button>
+        <button onclick="hostSelectCount(6)" id="hbtn-6">6</button>
+      </div>
+      <input type="text" id="host-name-input" placeholder="Your name" maxlength="20" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid #444;background:#2a2a4a;color:#eee;font-size:0.95rem;outline:none;text-align:center;">
+      <button class="join-btn" onclick="createRoom()">Create Room</button>
+    </div>
+
+    <!-- Lobby panel (after room created) -->
+    <div id="lobby-panel" class="online-sub-panel">
+      <p class="status-text">Room Code</p>
+      <div class="room-code-display" onclick="copyRoomCode()"><span id="room-code-display">---</span><span class="copy-toast" id="copy-toast">Copied!</span></div>
+      <p class="status-text" id="lobby-status">Waiting for players...</p>
+      <div class="lobby-players" id="lobby-players"></div>
+    </div>
+
+    <!-- Join room panel -->
+    <div id="join-room-panel" class="online-sub-panel">
+      <input type="text" id="join-room-input" placeholder="ROOM CODE" maxlength="6">
+      <input type="text" id="join-name-input" placeholder="Your name" maxlength="20">
+      <button class="join-btn" id="join-btn" onclick="joinRoom()">Join</button>
+      <p id="join-status" class="status-text"></p>
+    </div>
+
+    <!-- Client waiting panel -->
+    <div id="client-wait-panel" class="online-sub-panel">
+      <p class="status-text" id="client-wait-status">Connecting...</p>
+      <div class="lobby-players" id="client-lobby-players"></div>
+    </div>
+  </div>
+
   <button id="start-btn" onclick="startGame()">Start Game</button>
-  <button style="margin-top:8px;padding:8px 24px;border-radius:8px;border:1px solid #555;background:#2a2a4a;color:#ccc;cursor:pointer;font-size:0.9rem;" onclick="toggleHelp()">Rules</button>
+  <button class="setup-btn" onclick="toggleHelp()">Rules</button>
 </div>
 
 <!-- Game Screen -->
 <div id="game-screen">
   <div id="top-bar">
     <button id="undo-btn" onclick="undoTurn()" disabled>Undo</button>
-    <button onclick="restartGame()">New Game</button>
+    <button onclick="leaveGame()">Leave Game</button>
     <button onclick="toggleHelp()">Rules</button>
   </div>
   <div id="canvas-wrap">
@@ -326,7 +562,16 @@
   <div id="win-box">
     <h2 id="win-title">Player Wins!</h2>
     <p id="win-sub">Congratulations!</p>
-    <button onclick="restartGame()">Play Again</button>
+    <button onclick="leaveGame()">Back to Menu</button>
+  </div>
+</div>
+
+<!-- Disconnect Overlay -->
+<div id="disconnect-overlay">
+  <div id="disconnect-box">
+    <h2 id="disconnect-title">Disconnected</h2>
+    <p id="disconnect-msg">A player has disconnected.</p>
+    <button onclick="leaveGame()">Back to Menu</button>
   </div>
 </div>
 
@@ -369,7 +614,7 @@
     </ul>
 
     <h3>Players</h3>
-    <p>Supports 2, 3, 4, or 6 players sharing the same device, taking turns in order.</p>
+    <p>Supports 2, 3, 4, or 6 players. Play locally on the same device, or online with friends using a room code.</p>
   </div>
 </div>
 
@@ -380,10 +625,8 @@
 const COLORS = ['#e84855','#3185fc','#44c767','#f5a623','#a855f7','#22d3ee'];
 const COLOR_NAMES = ['Red','Blue','Green','Orange','Purple','Cyan'];
 const DIRECTIONS = [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[-1,1]];
-// Directions in (x, y) coordinate space for long hops
 const XY_DIRS = [[1, 0], [-1, 0], [0.5, 1], [-0.5, 1], [0.5, -1], [-0.5, -1]];
 
-// Which triangles each player count uses (triangle indices 0-5 clockwise from top)
 const PLAYER_CONFIGS = {
   2: [0, 3],
   3: [0, 2, 4],
@@ -394,197 +637,20 @@ const PLAYER_CONFIGS = {
 // ============================================================
 // Board Generation
 // ============================================================
-
-// We define the board using the classic row structure.
-// Row index 0 = top of star, row 16 = bottom.
-// Each entry: [rowLength, qStart] where qStart positions the row in axial q.
-// We use axial coordinates with r = row - 8 (center row 8 has r=0).
-// For the triangular grid, in odd-offset rows q shifts by 0.5, but we use
-// axial coords where hex_to_pixel handles staggering.
-
-// The star-shaped board row by row. Each row has a length and a starting q offset.
-// We'll generate positions such that the board is symmetric.
-
-// Actually, let's use a different, cleaner approach: define the board as a set of
-// (row, col) positions on a triangular grid, then convert to axial.
-// The board has 17 rows. We number positions within each row from 0.
-
 const ROW_DEFS = [
-  // [length, rowIndex]  — rowIndex is the visual row from top (0-16)
-  // Top triangle (rows 0-3)
-  { len: 1,  row: 0 },
-  { len: 2,  row: 1 },
-  { len: 3,  row: 2 },
-  { len: 4,  row: 3 },
-  // Central band (rows 4-12)
-  { len: 13, row: 4 },
-  { len: 12, row: 5 },
-  { len: 11, row: 6 },
-  { len: 10, row: 7 },
+  { len: 1,  row: 0 },  { len: 2,  row: 1 },  { len: 3,  row: 2 },  { len: 4,  row: 3 },
+  { len: 13, row: 4 },  { len: 12, row: 5 },  { len: 11, row: 6 },  { len: 10, row: 7 },
   { len: 9,  row: 8 },
-  { len: 10, row: 9 },
-  { len: 11, row: 10 },
-  { len: 12, row: 11 },
-  { len: 13, row: 12 },
-  // Bottom triangle (rows 13-16)
-  { len: 4,  row: 13 },
-  { len: 3,  row: 14 },
-  { len: 2,  row: 15 },
-  { len: 1,  row: 16 },
+  { len: 10, row: 9 },  { len: 11, row: 10 }, { len: 12, row: 11 }, { len: 13, row: 12 },
+  { len: 4,  row: 13 }, { len: 3,  row: 14 }, { len: 2,  row: 15 }, { len: 1,  row: 16 },
 ];
-
-// We store positions as {row, col} in a flat grid, using (row, col) as the key.
-// For adjacency on a triangular grid with staggered rows:
-// Even rows and odd rows stagger differently.
-// But Chinese Checkers uses a triangular lattice, not a hex grid per se.
-// The simplest approach: use (row, col) and define 6 neighbors based on row parity.
-
-// Actually, for a star board, the connectivity is simpler if we think of it as:
-// each cell connects to its left/right neighbor in the same row, and to cells
-// in the rows above and below. The staggering depends on whether the next row
-// is wider or narrower.
-
-// Let me use a more direct approach: offset-based coordinates.
-// For each row, we define a "center offset" so that cells are visually centered.
-// Two cells are adjacent if they are in the same row and differ by 1 in col,
-// or in adjacent rows and their visual positions overlap.
-
-// Let's assign each cell a fractional x-position for adjacency:
-// xPos = col - (len - 1) / 2
-// This centers each row at x=0. Two cells in adjacent rows are vertically adjacent
-// if their xPos values differ by ±0.5.
-
-// But we need to be careful about the direction of stagger in different parts of the board.
-// In the top triangle (rows 0-3), each row is 1 wider than the previous, expanding to the left.
-// In the center band, rows 4-8 shrink by 1 each, rows 8-12 grow by 1 each.
-
-// Let me define exact fractional x-positions for each row.
-
-// Visual layout: each cell is a circle on a triangular grid.
-// Vertical spacing between rows: sqrt(3)/2 * cellSize
-// Horizontal spacing: cellSize
-// Stagger: each row is offset by 0.5 * cellSize from adjacent rows.
-
-// For correct staggering, let's define the leftmost x-position of each row:
 
 function buildBoard() {
   const positions = [];
-  const triangles = [[], [], [], [], [], []]; // 6 triangles of 10 positions each
-
-  // We define the x-offset (in half-units) for each row's first cell.
-  // The board center is at row 8. We want the board symmetric around x=0.
-  // Each cell occupies 1 unit of horizontal space.
-  // Adjacent rows are staggered by 0.5 units.
-
-  // Let's define xStart for each row so that the row is centered at x = 0.
-  // xStart = -(len - 1) / 2
-  // Then cell j in row i has x = xStart + j
-
-  // But we also need to handle the stagger between the triangles and the center band.
-  // The key insight: in the top triangle, row 0 has 1 cell, row 1 has 2 cells.
-  // Row 0's cell is centered. Row 1's cells should be at -0.5 and +0.5.
-  // Row 2: -1, 0, 1. Row 3: -1.5, -0.5, 0.5, 1.5.
-  // Row 4 (center band, len 13): center band starts. It should connect to row 3.
-  // Row 3 has cells at -1.5, -0.5, 0.5, 1.5
-  // Row 4 has 13 cells. These connect to row 3 and also extend to the side triangles.
-  // Row 4 should be at -6, -5, -4, ..., 5, 6
-
-  // Let me think about this differently. The center band (rows 4-12) forms a hexagon.
-  // Row 8 (center) has 9 cells: positions -4 to +4
-  // Row 7: 10 cells, -4.5 to +4.5
-  // Row 6: 11 cells, -5 to +5
-  // Row 5: 12 cells, -5.5 to +5.5
-  // Row 4: 13 cells, -6 to +6
-  // Row 9: 10 cells, -4.5 to +4.5
-  // Row 10: 11 cells, -5 to +5
-  // Row 11: 12 cells, -5.5 to +5.5
-  // Row 12: 13 cells, -6 to +6
-
-  // Top triangle:
-  // Row 3: 4 cells. These must connect to row 4.
-  // Row 4 center 4 cells are at positions ... we need row 3 to stagger with row 4.
-  // If row 4 goes -6, -5, ..., 6 (integer positions)
-  // Then row 3 should go -1.5, -0.5, 0.5, 1.5 (half-integer)
-  // Row 2: -1, 0, 1 (integer)
-  // Row 1: -0.5, 0.5 (half-integer)
-  // Row 0: 0 (integer)
-
-  // Bottom triangle (symmetric):
-  // Row 13: 4 cells at -1.5, -0.5, 0.5, 1.5
-  // Row 14: 3 cells at -1, 0, 1
-  // Row 15: 2 cells at -0.5, 0.5
-  // Row 16: 1 cell at 0
-
-  // For the center band, checking row 4 (-6..6 integers) and row 5:
-  // Row 5 has 12 cells at -5.5, -4.5, ..., 5.5 (half-integers). Good, stagger works.
-
-  // So the x-position of cell j in row i is:
-  // x(i, j) = -(len-1)/2 + j
-
-  // This gives us the staggering pattern above. Let's verify adjacency:
-  // Row 4, cell at x=-6 should connect to row 5, cells at x=-5.5 and x=-6.5.
-  // Row 5 goes from -5.5 to 5.5, so no -6.5. So x=-6 only connects down to -5.5. Good, this is the left edge of the hex.
-
-  // Now let's identify the 6 triangles:
-  // Triangle 0 (top): rows 0-3 (all cells)
-  // Triangle 3 (bottom): rows 13-16 (all cells)
-  // Triangles 1,2,4,5 (side triangles): these are in the center band rows.
-  // The center hexagon (rows 4-12) has a hex shape. The 4 side triangles
-  // extend beyond the hex at the corners.
-
-  // The center hexagon has rows 4-12. The hex interior at row 4 has 9 cells
-  // (matching the narrowest row 8). But row 4 has 13 cells. The extra 4 cells
-  // (2 on each side) are part of the side triangles... wait, that's only 2 extra
-  // on each side at row 4, growing to 0 at row 8.
-
-  // Actually at row 4 (len 13), the hex interior would be 9 cells wide (same as row 8 but offset).
-  // Wait, the hex interior has varying width. Let me reconsider.
-
-  // The hexagonal body = 61 cells. Rows 4-12, but trimmed to a hexagonal shape.
-  // Row 4: 13 cells total. How many are in the hex body?
-  // The hex body at row 4: should be len 9 (same width as row 8, the center).
-  // No wait - a regular hexagon centered at row 8 would have:
-  // row 8: 9, row 7&9: 9, row 6&10: 9, row 5&11: 9, row 4&12: 9
-  // That gives 9*9 = 81 which is too many.
-
-  // Actually in a hex grid, a hexagon of radius 4 has concentric rings.
-  // Let me just use the simpler approach: the hex body is NOT a neat hex —
-  // the "star" is defined exactly by those 17 row lengths, and the 6 triangles
-  // are the 6 tips. The remaining 61 cells are the center.
-
-  // The 4 side triangles (upper-right, lower-right, lower-left, upper-left) are:
-  // Upper-right triangle (tri 1): at the right side of rows 4-7
-  //   Row 4: rightmost 4 cells (x = 3.5, 4.5, 5.5, 6) wait, integers: 3,4,5,6
-  //   Row 5: rightmost 3 cells
-  //   Row 6: rightmost 2 cells
-  //   Row 7: rightmost 1 cell
-  //   Total: 4+3+2+1 = 10 ✓
-
-  // Lower-right triangle (tri 2): at the right side of rows 9-12
-  //   Row 9: rightmost 1 cell
-  //   Row 10: rightmost 2 cells
-  //   Row 11: rightmost 3 cells
-  //   Row 12: rightmost 4 cells
-  //   Total: 10 ✓
-
-  // Lower-left triangle (tri 4): at the left side of rows 9-12
-  //   Row 9: leftmost 1 cell
-  //   Row 10: leftmost 2 cells
-  //   Row 11: leftmost 3 cells
-  //   Row 12: leftmost 4 cells
-  //   Total: 10 ✓
-
-  // Upper-left triangle (tri 5): at the left side of rows 4-7
-  //   Row 4: leftmost 4 cells
-  //   Row 5: leftmost 3 cells
-  //   Row 6: leftmost 2 cells
-  //   Row 7: leftmost 1 cell
-  //   Total: 10 ✓
-
+  const triangles = [[], [], [], [], [], []];
   const rowLens = [1,2,3,4, 13,12,11,10,9,10,11,12,13, 4,3,2,1];
   const rowXStarts = rowLens.map(len => -(len - 1) / 2);
 
-  // Build all positions
   for (let r = 0; r < 17; r++) {
     const len = rowLens[r];
     const xs = rowXStarts[r];
@@ -592,63 +658,36 @@ function buildBoard() {
       const x = xs + c;
       const pos = { row: r, col: c, x: x, y: r };
       positions.push(pos);
-
-      // Classify into triangles
       if (r <= 3) {
-        // Top triangle (tri 0)
         triangles[0].push(pos);
       } else if (r >= 13) {
-        // Bottom triangle (tri 3)
         triangles[3].push(pos);
       } else if (r >= 4 && r <= 7) {
-        // Check upper-right (tri 1) and upper-left (tri 5)
-        // The hex body at this row has width: 9 + (8 - r) ... let me think differently.
-        // At row 4, center band len=13. The hex body center portion = 13 - 4 - 4 = 5? No.
-        // The side triangles have 4-r+4 cells at row r (for rows 4-7) on each side:
-        // Row 4: 4 cells each side, Row 5: 3, Row 6: 2, Row 7: 1
-        const sideCount = 4 - (r - 4); // 4,3,2,1
-        if (c < sideCount) {
-          triangles[5].push(pos); // upper-left
-        } else if (c >= len - sideCount) {
-          triangles[1].push(pos); // upper-right
-        }
+        const sideCount = 4 - (r - 4);
+        if (c < sideCount) triangles[5].push(pos);
+        else if (c >= len - sideCount) triangles[1].push(pos);
       } else if (r >= 9 && r <= 12) {
-        // Check lower-right (tri 2) and lower-left (tri 4)
-        const sideCount = r - 8; // 1,2,3,4
-        if (c < sideCount) {
-          triangles[4].push(pos); // lower-left
-        } else if (c >= len - sideCount) {
-          triangles[2].push(pos); // lower-right
-        }
+        const sideCount = r - 8;
+        if (c < sideCount) triangles[4].push(pos);
+        else if (c >= len - sideCount) triangles[2].push(pos);
       }
     }
   }
-
   return { positions, triangles, rowLens, rowXStarts };
 }
 
-// Build adjacency map
-function buildAdjacency(positions, rowLens, rowXStarts) {
-  // Key: "row,col" -> list of {row, col} neighbors
+function buildAdjacency(positions) {
   const adj = new Map();
-  const posSet = new Map(); // "x,y" -> {row, col, x, y}
-
-  // Index positions by their (x, y) for fast lookup
-  for (const p of positions) {
-    posSet.set(`${p.x},${p.y}`, p);
-  }
+  const posSet = new Map();
+  for (const p of positions) posSet.set(`${p.x},${p.y}`, p);
 
   for (const p of positions) {
     const key = `${p.row},${p.col}`;
     const neighbors = [];
-
-    // Same row: left and right
     const left = posSet.get(`${p.x - 1},${p.y}`);
     const right = posSet.get(`${p.x + 1},${p.y}`);
     if (left) neighbors.push(left);
     if (right) neighbors.push(right);
-
-    // Adjacent rows: above (y-1) and below (y+1), at x ± 0.5
     for (const dy of [-1, 1]) {
       const ny = p.y + dy;
       for (const dx of [-0.5, 0.5]) {
@@ -657,39 +696,65 @@ function buildAdjacency(positions, rowLens, rowXStarts) {
         if (neighbor) neighbors.push(neighbor);
       }
     }
-
     adj.set(key, neighbors);
   }
-
   return { adj, posSet };
 }
 
 // ============================================================
 // Game State
 // ============================================================
-let boardData = null; // { positions, triangles, rowLens, rowXStarts }
-let adjData = null;   // { adj, posSet }
-let board = new Map(); // "row,col" -> null | playerIndex
-let players = [];      // [{name, color, triangleIndex, goalTriangleIndex, finished}]
+let boardData = null;
+let adjData = null;
+let board = new Map();
+let players = [];
 let currentPlayerIdx = 0;
 let selectedPeg = null;
 let validMoves = new Set();
-let isHopping = false; // true if mid-chain-hop
-let hopOrigin = null;  // where the hop chain started (to allow undo)
+let isHopping = false;
 let gameOver = false;
 let selectedCount = 2;
 let finishOrder = [];
-let hoveredPos = null;      // position the mouse is over
-let invalidFlash = null;    // {row, col, time} for red flash on invalid move
-let turnSnapshot = null;    // {board, playerIdx} state at start of turn for undo
-let turnMoved = false;      // has current player made a move this turn
+let hoveredPos = null;
+let invalidFlash = null;
+let turnSnapshot = null;
+let turnMoved = false;
+
+// ============================================================
+// Network State
+// ============================================================
+let networkMode = null;    // null = local, 'host', 'client'
+let peer = null;
+let connections = [];      // host: DataConnections to clients
+let hostConnection = null; // client: DataConnection to host
+let myPlayerIndex = null;  // which player index this device controls (online only)
+let roomCode = null;
+let lobbyPlayers = [];     // host lobby: [{name, connected}]
+let hostPlayerCount = 2;
 
 // ============================================================
 // Setup Screen Logic
 // ============================================================
+function selectMode(mode) {
+  document.getElementById('btn-local').classList.toggle('selected', mode === 'local');
+  document.getElementById('btn-online').classList.toggle('selected', mode === 'online');
+  document.getElementById('local-panel').style.display = mode === 'local' ? 'block' : 'none';
+  document.getElementById('online-panel').style.display = mode === 'online' ? 'flex' : 'none';
+  document.getElementById('start-btn').style.display = mode === 'local' ? 'block' : 'none';
+
+  // Reset online panels
+  document.getElementById('create-room-panel').classList.remove('show');
+  document.getElementById('join-room-panel').classList.remove('show');
+  document.getElementById('lobby-panel').classList.remove('show');
+  document.getElementById('client-wait-panel').classList.remove('show');
+  document.getElementById('btn-create').classList.remove('selected');
+  document.getElementById('btn-join').classList.remove('selected');
+  cleanupNetwork();
+}
+
 function selectCount(n) {
   selectedCount = n;
-  document.querySelectorAll('.player-count-btns button').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('#local-panel .player-count-btns button').forEach(b => b.classList.remove('selected'));
   document.getElementById(`btn-${n}`).classList.add('selected');
 
   const triIndices = PLAYER_CONFIGS[n];
@@ -704,7 +769,460 @@ function selectCount(n) {
   });
 }
 
+// ============================================================
+// Online: Create Room
+// ============================================================
+function showCreateRoom() {
+  document.getElementById('btn-create').classList.add('selected');
+  document.getElementById('btn-join').classList.remove('selected');
+  document.getElementById('create-room-panel').classList.add('show');
+  document.getElementById('join-room-panel').classList.remove('show');
+  document.getElementById('lobby-panel').classList.remove('show');
+  document.getElementById('client-wait-panel').classList.remove('show');
+  hostSelectCount(2);
+}
+
+function hostSelectCount(n) {
+  hostPlayerCount = n;
+  document.querySelectorAll('#create-room-panel .player-count-btns button').forEach(b => b.classList.remove('selected'));
+  document.getElementById(`hbtn-${n}`).classList.add('selected');
+}
+
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 5; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+function createRoom() {
+  const hostName = document.getElementById('host-name-input').value.trim() || 'Host';
+  roomCode = generateRoomCode();
+  networkMode = 'host';
+  myPlayerIndex = 0;
+
+  const triIndices = PLAYER_CONFIGS[hostPlayerCount];
+  lobbyPlayers = triIndices.map((tri, i) => ({
+    name: i === 0 ? hostName : null,
+    triangleIndex: tri,
+    connected: i === 0
+  }));
+
+  // Show lobby
+  document.getElementById('create-room-panel').classList.remove('show');
+  document.getElementById('lobby-panel').classList.add('show');
+  document.getElementById('room-code-display').textContent = roomCode;
+  updateLobbyUI();
+
+  // Create PeerJS peer
+  peer = new Peer('cc-' + roomCode);
+  peer.on('open', () => {
+    document.getElementById('lobby-status').textContent = 'Waiting for players to join...';
+  });
+  peer.on('error', (err) => {
+    document.getElementById('lobby-status').textContent = 'Connection error: ' + err.type;
+    document.getElementById('lobby-status').className = 'status-text error-text';
+  });
+  peer.on('connection', (conn) => {
+    conn.on('open', () => {
+      conn.on('data', (data) => handleHostMessage(conn, data));
+      conn.on('close', () => handleClientDisconnect(conn));
+    });
+  });
+}
+
+function handleHostMessage(conn, data) {
+  if (data.type === 'join') {
+    // Assign next available slot
+    const slotIdx = lobbyPlayers.findIndex(s => !s.connected && s.name === null);
+    if (slotIdx === -1) {
+      conn.send({ type: 'error', message: 'Room is full' });
+      return;
+    }
+    lobbyPlayers[slotIdx].name = data.name;
+    lobbyPlayers[slotIdx].connected = true;
+    conn._playerIndex = slotIdx;
+    connections.push(conn);
+
+    conn.send({
+      type: 'slot-assigned',
+      playerIndex: slotIdx,
+      triangleIndex: lobbyPlayers[slotIdx].triangleIndex,
+      color: COLORS[lobbyPlayers[slotIdx].triangleIndex],
+      colorName: COLOR_NAMES[lobbyPlayers[slotIdx].triangleIndex]
+    });
+
+    updateLobbyUI();
+    broadcastLobbyUpdate();
+
+    // Auto-start when all slots filled
+    const allFilled = lobbyPlayers.every(s => s.connected);
+    if (allFilled) {
+      document.getElementById('start-btn').style.display = 'block';
+      document.getElementById('start-btn').disabled = false;
+      document.getElementById('lobby-status').textContent = 'All players joined! Starting...';
+      setTimeout(() => startOnlineGame(), 500);
+    }
+  } else if (data.type === 'move-action') {
+    handleRemoteMove(data);
+  } else if (data.type === 'end-turn-action') {
+    if (data.playerIndex === currentPlayerIdx && isHopping) {
+      isHopping = false;
+      advanceTurn();
+      broadcastStateUpdate();
+    }
+  } else if (data.type === 'undo-action') {
+    if (turnSnapshot && data.playerIndex === turnSnapshot.playerIdx) {
+      board = new Map(turnSnapshot.board);
+      currentPlayerIdx = turnSnapshot.playerIdx;
+      selectedPeg = null;
+      validMoves = new Set();
+      isHopping = false;
+      turnMoved = false;
+      turnSnapshot = null;
+      document.getElementById('undo-btn').disabled = true;
+      document.getElementById('end-turn-btn').style.display = 'none';
+      updateUI();
+      render();
+      broadcastStateUpdate();
+    }
+  }
+}
+
+function handleRemoteMove(data) {
+  if (data.playerIndex !== currentPlayerIdx) return;
+  const fromKey = `${data.from.row},${data.from.col}`;
+  const toKey = `${data.to.row},${data.to.col}`;
+
+  if (board.get(fromKey) !== data.playerIndex) return;
+
+  // Validate the move
+  const fromPos = boardData.positions.find(p => p.row === data.from.row && p.col === data.from.col);
+  if (!fromPos) return;
+
+  // If mid-hop, only allow hops from selectedPeg
+  if (isHopping) {
+    if (!selectedPeg || selectedPeg.row !== data.from.row || selectedPeg.col !== data.from.col) return;
+    const hopMoves = getValidMoves(fromPos, true);
+    if (!hopMoves.has(toKey)) return;
+  } else {
+    selectedPeg = fromPos;
+    validMoves = getValidMoves(fromPos, false);
+    if (!validMoves.has(toKey)) return;
+  }
+
+  // Save snapshot before first move
+  if (!turnMoved) {
+    saveTurnSnapshot();
+    turnMoved = true;
+    document.getElementById('undo-btn').disabled = false;
+  }
+
+  // Execute
+  const neighbors = adjData.adj.get(fromKey) || [];
+  const toPos = boardData.positions.find(p => p.row === data.to.row && p.col === data.to.col);
+  const isStep = neighbors.some(n => n.row === toPos.row && n.col === toPos.col);
+
+  board.set(fromKey, null);
+  board.set(toKey, currentPlayerIdx);
+
+  if (isStep) {
+    selectedPeg = null;
+    validMoves = new Set();
+    render();
+    setTimeout(() => { advanceTurn(); broadcastStateUpdate(); }, 200);
+  } else {
+    selectedPeg = toPos;
+    const nextMoves = getValidMoves(toPos, true);
+    if (nextMoves.size > 0) {
+      isHopping = true;
+      validMoves = nextMoves;
+      document.getElementById('end-turn-btn').style.display = 'block';
+      render();
+      broadcastStateUpdate();
+    } else {
+      selectedPeg = null;
+      validMoves = new Set();
+      render();
+      setTimeout(() => { advanceTurn(); broadcastStateUpdate(); }, 200);
+    }
+  }
+}
+
+function handleClientDisconnect(conn) {
+  const idx = conn._playerIndex;
+  if (idx !== undefined && lobbyPlayers[idx]) {
+    const name = lobbyPlayers[idx].name;
+    // During game
+    if (document.getElementById('game-screen').style.display === 'flex') {
+      document.getElementById('disconnect-title').textContent = 'Player Disconnected';
+      document.getElementById('disconnect-msg').textContent = `${name} has disconnected.`;
+      document.getElementById('disconnect-overlay').classList.add('show');
+    }
+  }
+  connections = connections.filter(c => c !== conn);
+}
+
+function broadcastLobbyUpdate() {
+  const data = {
+    type: 'lobby-update',
+    players: lobbyPlayers.map(s => ({ name: s.name, triangleIndex: s.triangleIndex, connected: s.connected }))
+  };
+  connections.forEach(c => c.send(data));
+}
+
+function broadcastStateUpdate() {
+  const data = {
+    type: 'state-update',
+    board: Array.from(board.entries()),
+    currentPlayerIdx,
+    isHopping,
+    selectedPeg: selectedPeg ? { row: selectedPeg.row, col: selectedPeg.col } : null,
+    gameOver,
+    finishOrder,
+    players: players.map(p => ({ name: p.name, color: p.color, colorName: p.colorName, triangleIndex: p.triangleIndex, goalTriangleIndex: p.goalTriangleIndex, finished: p.finished, finishPlace: p.finishPlace })),
+    turnSnapshot: turnSnapshot ? { board: Array.from(turnSnapshot.board.entries()), playerIdx: turnSnapshot.playerIdx } : null,
+    turnMoved
+  };
+  connections.forEach(c => c.send(data));
+}
+
+function updateLobbyUI() {
+  const container = document.getElementById('lobby-players');
+  container.innerHTML = '';
+  lobbyPlayers.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'lobby-slot' + (s.connected ? '' : ' empty');
+    div.innerHTML = `<span class="ldot" style="background:${COLORS[s.triangleIndex]}"></span>
+      <span>${s.name || 'Waiting...'}</span>`;
+    container.appendChild(div);
+  });
+}
+
+// ============================================================
+// Online: Join Room
+// ============================================================
+function showJoinRoom() {
+  document.getElementById('btn-join').classList.add('selected');
+  document.getElementById('btn-create').classList.remove('selected');
+  document.getElementById('join-room-panel').classList.add('show');
+  document.getElementById('create-room-panel').classList.remove('show');
+  document.getElementById('lobby-panel').classList.remove('show');
+  document.getElementById('client-wait-panel').classList.remove('show');
+  document.getElementById('join-status').textContent = '';
+}
+
+function joinRoom() {
+  const code = document.getElementById('join-room-input').value.trim().toUpperCase();
+  const name = document.getElementById('join-name-input').value.trim() || 'Player';
+  if (!code || code.length < 3) {
+    document.getElementById('join-status').textContent = 'Enter a valid room code';
+    document.getElementById('join-status').className = 'status-text error-text';
+    return;
+  }
+
+  document.getElementById('join-btn').disabled = true;
+  document.getElementById('join-status').textContent = 'Connecting...';
+  document.getElementById('join-status').className = 'status-text';
+
+  networkMode = 'client';
+  peer = new Peer();
+  peer.on('open', () => {
+    hostConnection = peer.connect('cc-' + code);
+    const timeout = setTimeout(() => {
+      document.getElementById('join-status').textContent = 'Could not connect. Check room code.';
+      document.getElementById('join-status').className = 'status-text error-text';
+      document.getElementById('join-btn').disabled = false;
+      cleanupNetwork();
+    }, 8000);
+
+    hostConnection.on('open', () => {
+      clearTimeout(timeout);
+      hostConnection.send({ type: 'join', name });
+      hostConnection.on('data', (data) => handleClientMessage(data));
+      hostConnection.on('close', () => {
+        if (document.getElementById('game-screen').style.display === 'flex') {
+          document.getElementById('disconnect-title').textContent = 'Disconnected';
+          document.getElementById('disconnect-msg').textContent = 'Lost connection to the host.';
+          document.getElementById('disconnect-overlay').classList.add('show');
+        } else {
+          document.getElementById('join-status').textContent = 'Host disconnected.';
+          document.getElementById('join-status').className = 'status-text error-text';
+          document.getElementById('join-btn').disabled = false;
+        }
+      });
+    });
+    hostConnection.on('error', () => {
+      clearTimeout(timeout);
+      document.getElementById('join-status').textContent = 'Connection failed.';
+      document.getElementById('join-status').className = 'status-text error-text';
+      document.getElementById('join-btn').disabled = false;
+    });
+  });
+  peer.on('error', (err) => {
+    document.getElementById('join-status').textContent = 'Error: ' + err.type;
+    document.getElementById('join-status').className = 'status-text error-text';
+    document.getElementById('join-btn').disabled = false;
+  });
+}
+
+function handleClientMessage(data) {
+  if (data.type === 'error') {
+    document.getElementById('join-status').textContent = data.message;
+    document.getElementById('join-status').className = 'status-text error-text';
+    document.getElementById('join-btn').disabled = false;
+    cleanupNetwork();
+  } else if (data.type === 'slot-assigned') {
+    myPlayerIndex = data.playerIndex;
+    roomCode = document.getElementById('join-room-input').value.trim().toUpperCase();
+    // Show waiting panel
+    document.getElementById('join-room-panel').classList.remove('show');
+    document.getElementById('client-wait-panel').classList.add('show');
+    document.getElementById('client-wait-status').textContent =
+      `You are ${data.colorName} (Player ${data.playerIndex + 1}). Waiting for host to start...`;
+    document.getElementById('client-wait-status').className = 'status-text success-text';
+  } else if (data.type === 'lobby-update') {
+    const container = document.getElementById('client-lobby-players');
+    container.innerHTML = '';
+    data.players.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'lobby-slot' + (s.connected ? '' : ' empty');
+      div.innerHTML = `<span class="ldot" style="background:${COLORS[s.triangleIndex]}"></span>
+        <span>${s.name || 'Waiting...'}</span>`;
+      container.appendChild(div);
+    });
+  } else if (data.type === 'game-start') {
+    applyGameStart(data);
+  } else if (data.type === 'state-update') {
+    applyStateUpdate(data);
+  }
+}
+
+function applyGameStart(data) {
+  boardData = buildBoard();
+  adjData = buildAdjacency(boardData.positions);
+  players = data.players;
+  board = new Map(data.board);
+  currentPlayerIdx = 0;
+  selectedPeg = null;
+  validMoves = new Set();
+  isHopping = false;
+  gameOver = false;
+  finishOrder = [];
+  turnMoved = false;
+  turnSnapshot = null;
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'flex';
+  document.getElementById('start-btn').style.display = 'none';
+  resizeCanvas();
+  updateUI();
+  render();
+}
+
+function applyStateUpdate(data) {
+  board = new Map(data.board);
+  currentPlayerIdx = data.currentPlayerIdx;
+  isHopping = data.isHopping;
+  gameOver = data.gameOver;
+  finishOrder = data.finishOrder;
+  turnMoved = data.turnMoved;
+  if (data.players) {
+    players = data.players;
+  }
+  if (data.selectedPeg && currentPlayerIdx === myPlayerIndex) {
+    selectedPeg = boardData.positions.find(p => p.row === data.selectedPeg.row && p.col === data.selectedPeg.col) || null;
+    if (selectedPeg && isHopping) {
+      validMoves = getValidMoves(selectedPeg, true);
+    }
+  } else {
+    selectedPeg = null;
+    validMoves = new Set();
+  }
+  // Restore undo state
+  if (data.turnSnapshot) {
+    turnSnapshot = { board: new Map(data.turnSnapshot.board), playerIdx: data.turnSnapshot.playerIdx };
+  } else {
+    turnSnapshot = null;
+  }
+  document.getElementById('undo-btn').disabled = !turnSnapshot;
+  document.getElementById('end-turn-btn').style.display = (isHopping && currentPlayerIdx === myPlayerIndex) ? 'block' : 'none';
+  updateUI();
+  render();
+  if (gameOver) showWinScreen();
+}
+
+// ============================================================
+// Online: Start Game (host)
+// ============================================================
+function startOnlineGame() {
+  const triIndices = PLAYER_CONFIGS[hostPlayerCount];
+  players = lobbyPlayers.map((s, i) => ({
+    name: s.name || `Player ${i + 1}`,
+    color: COLORS[s.triangleIndex],
+    colorName: COLOR_NAMES[s.triangleIndex],
+    triangleIndex: s.triangleIndex,
+    goalTriangleIndex: (s.triangleIndex + 3) % 6,
+    finished: false,
+    finishPlace: -1
+  }));
+
+  boardData = buildBoard();
+  adjData = buildAdjacency(boardData.positions);
+  initBoard();
+  currentPlayerIdx = 0;
+  selectedPeg = null;
+  validMoves = new Set();
+  isHopping = false;
+  gameOver = false;
+  finishOrder = [];
+  turnMoved = false;
+  turnSnapshot = null;
+
+  // Broadcast game start
+  const startData = {
+    type: 'game-start',
+    players: players.map(p => ({ name: p.name, color: p.color, colorName: p.colorName, triangleIndex: p.triangleIndex, goalTriangleIndex: p.goalTriangleIndex, finished: p.finished, finishPlace: p.finishPlace })),
+    board: Array.from(board.entries())
+  };
+  connections.forEach(c => c.send(startData));
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'flex';
+  document.getElementById('start-btn').style.display = 'none';
+  resizeCanvas();
+  updateUI();
+  render();
+}
+
+// ============================================================
+// Network Helpers
+// ============================================================
+function cleanupNetwork() {
+  if (peer) { peer.destroy(); peer = null; }
+  connections = [];
+  hostConnection = null;
+  networkMode = null;
+  myPlayerIndex = null;
+  roomCode = null;
+  lobbyPlayers = [];
+}
+
+function sendToHost(data) {
+  if (hostConnection && hostConnection.open) hostConnection.send(data);
+}
+
+function isMyTurn() {
+  if (!networkMode) return true; // local mode
+  return myPlayerIndex === currentPlayerIdx;
+}
+
+// ============================================================
+// Start Game (local)
+// ============================================================
 function startGame() {
+  if (networkMode) return; // online uses startOnlineGame
+
   const triIndices = PLAYER_CONFIGS[selectedCount];
   players = triIndices.map((tri, i) => {
     const input = document.getElementById(`pname-${i}`);
@@ -721,7 +1239,7 @@ function startGame() {
   });
 
   boardData = buildBoard();
-  adjData = buildAdjacency(boardData.positions, boardData.rowLens, boardData.rowXStarts);
+  adjData = buildAdjacency(boardData.positions);
   initBoard();
   currentPlayerIdx = 0;
   selectedPeg = null;
@@ -729,15 +1247,26 @@ function startGame() {
   isHopping = false;
   gameOver = false;
   finishOrder = [];
+  turnMoved = false;
+  turnSnapshot = null;
 
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('game-screen').style.display = 'flex';
   document.getElementById('win-overlay').classList.remove('show');
 
-  turnMoved = false;
   resizeCanvas();
   updateUI();
   render();
+}
+
+function leaveGame() {
+  document.getElementById('game-screen').style.display = 'none';
+  document.getElementById('win-overlay').classList.remove('show');
+  document.getElementById('disconnect-overlay').classList.remove('show');
+  document.getElementById('setup-screen').style.display = 'flex';
+  document.getElementById('start-btn').style.display = networkMode ? 'none' : 'block';
+  cleanupNetwork();
+  selectMode('local');
 }
 
 function saveTurnSnapshot() {
@@ -747,8 +1276,12 @@ function saveTurnSnapshot() {
 
 function undoTurn() {
   if (!turnSnapshot) return;
+  if (networkMode === 'client') {
+    sendToHost({ type: 'undo-action', playerIndex: myPlayerIndex });
+    return;
+  }
   const name = players[turnSnapshot.playerIdx].name;
-  if (!confirm(`Undo ${name}'s move?`)) return;
+  if (!networkMode && !confirm(`Undo ${name}'s move?`)) return;
   board = new Map(turnSnapshot.board);
   currentPlayerIdx = turnSnapshot.playerIdx;
   selectedPeg = null;
@@ -760,12 +1293,7 @@ function undoTurn() {
   document.getElementById('end-turn-btn').style.display = 'none';
   updateUI();
   render();
-}
-
-function restartGame() {
-  document.getElementById('game-screen').style.display = 'none';
-  document.getElementById('win-overlay').classList.remove('show');
-  document.getElementById('setup-screen').style.display = 'flex';
+  if (networkMode === 'host') broadcastStateUpdate();
 }
 
 function initBoard() {
@@ -773,7 +1301,6 @@ function initBoard() {
   for (const p of boardData.positions) {
     board.set(`${p.row},${p.col}`, null);
   }
-  // Place pegs
   players.forEach((player, pi) => {
     const tri = boardData.triangles[player.triangleIndex];
     for (const pos of tri) {
@@ -793,10 +1320,8 @@ let offsetX = 0, offsetY = 0;
 function resizeCanvas() {
   const maxW = Math.min(window.innerWidth - 20, 700);
   const maxH = Math.min(window.innerHeight - 200, 700);
-  // Board spans x from -6 to 6 (13 units) and y from 0 to 16 (17 rows)
-  // with vertical spacing of sqrt(3)/2 * cellSize and horizontal of cellSize
-  const desiredW = 14 * 1; // 14 units wide
-  const desiredH = 16 * (Math.sqrt(3) / 2); // ~13.86 units tall
+  const desiredW = 14;
+  const desiredH = 16 * (Math.sqrt(3) / 2);
 
   cellSize = Math.min(maxW / (desiredW + 2), maxH / (desiredH + 2));
   cellSize = Math.max(cellSize, 12);
@@ -826,10 +1351,7 @@ function pixelToPos(mx, my) {
   for (const p of boardData.positions) {
     const { px, py } = posToPixel(p);
     const d = (mx - px) ** 2 + (my - py) ** 2;
-    if (d < minDist) {
-      minDist = d;
-      closest = p;
-    }
+    if (d < minDist) { minDist = d; closest = p; }
   }
   if (minDist < (cellSize * 0.7) ** 2) return closest;
   return null;
@@ -842,23 +1364,19 @@ function render() {
 
   const r = cellSize * 0.38;
 
-  // Draw board positions
   for (const pos of boardData.positions) {
     const { px, py } = posToPixel(pos);
     const key = `${pos.row},${pos.col}`;
     const occupant = board.get(key);
 
-    // Determine if this is a triangle position and which color to tint
     let bgColor = '#333';
     for (let t = 0; t < 6; t++) {
       if (boardData.triangles[t].some(p => p.row === pos.row && p.col === pos.col)) {
-        // Light tint of triangle color
         bgColor = hexToRgba(COLORS[t], 0.15);
         break;
       }
     }
 
-    // Draw cell background
     ctx.beginPath();
     ctx.arc(px, py, r, 0, Math.PI * 2);
     ctx.fillStyle = bgColor;
@@ -867,11 +1385,10 @@ function render() {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Hover highlight
+    // Hover highlight (only when it's my turn and a peg is selected)
     const isHovered = hoveredPos && hoveredPos.row === pos.row && hoveredPos.col === pos.col;
-    if (isHovered && selectedPeg) {
+    if (isHovered && selectedPeg && isMyTurn()) {
       if (occupant === null) {
-        // Empty cell hover: subtle neutral highlight
         ctx.beginPath();
         ctx.arc(px, py, r, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(200, 200, 220, 0.15)';
@@ -882,7 +1399,6 @@ function render() {
         ctx.lineWidth = 1.5;
         ctx.stroke();
       } else if (occupant !== currentPlayerIdx) {
-        // Occupied cell hover: X mark
         const xr = r * 0.45;
         ctx.strokeStyle = 'rgba(255, 80, 80, 0.6)';
         ctx.lineWidth = 2;
@@ -897,7 +1413,7 @@ function render() {
       }
     }
 
-    // Invalid move flash (red)
+    // Invalid move flash
     if (invalidFlash && invalidFlash.row === pos.row && invalidFlash.col === pos.col) {
       const elapsed = Date.now() - invalidFlash.time;
       if (elapsed < 400) {
@@ -920,14 +1436,12 @@ function render() {
       const isSelected = selectedPeg && selectedPeg.row === pos.row && selectedPeg.col === pos.col;
 
       if (isSelected) {
-        // Glow
         ctx.beginPath();
         ctx.arc(px, py, r + 4, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
         ctx.fill();
       }
 
-      // Peg body
       ctx.beginPath();
       ctx.arc(px, py, r - 1, 0, Math.PI * 2);
       const grad = ctx.createRadialGradient(px - r * 0.3, py - r * 0.3, r * 0.1, px, py, r);
@@ -953,9 +1467,7 @@ function lightenColor(hex, amt) {
   let r = parseInt(hex.slice(1, 3), 16);
   let g = parseInt(hex.slice(3, 5), 16);
   let b = parseInt(hex.slice(5, 7), 16);
-  r = Math.min(255, r + amt);
-  g = Math.min(255, g + amt);
-  b = Math.min(255, b + amt);
+  r = Math.min(255, r + amt); g = Math.min(255, g + amt); b = Math.min(255, b + amt);
   return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
 }
 
@@ -963,9 +1475,7 @@ function darkenColor(hex, amt) {
   let r = parseInt(hex.slice(1, 3), 16);
   let g = parseInt(hex.slice(3, 5), 16);
   let b = parseInt(hex.slice(5, 7), 16);
-  r = Math.max(0, r - amt);
-  g = Math.max(0, g - amt);
-  b = Math.max(0, b - amt);
+  r = Math.max(0, r - amt); g = Math.max(0, g - amt); b = Math.max(0, b - amt);
   return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
 }
 
@@ -978,86 +1488,52 @@ function getValidMoves(pos, hopsOnly) {
   const neighbors = adjData.adj.get(key) || [];
 
   if (!hopsOnly) {
-    // Single steps to adjacent empty cells
     for (const n of neighbors) {
       const nk = `${n.row},${n.col}`;
-      if (board.get(nk) === null) {
-        moves.add(nk);
-      }
+      if (board.get(nk) === null) moves.add(nk);
     }
   }
 
-  // Hops — supports both standard and long hops
-  // Standard hop: peg is adjacent, land on the empty cell directly opposite.
-  // Long hop: N empty spaces, then a peg, then exactly N empty spaces — land on the Nth.
-  // (Standard hop is the N=0 case of long hop.)
-  //
-  // When hopsOnly=false (first move of turn): BFS to find all chain-reachable hop destinations.
-  // When hopsOnly=true (mid-chain): only find immediate hops from current position
-  //   (the click handler manages the chain step-by-step).
   const visited = new Set();
   visited.add(key);
   const queue = [pos];
 
   while (queue.length > 0) {
     const cur = queue.shift();
-
     for (const [dx, dy] of XY_DIRS) {
-      // Scan along this direction from cur
       let cx = cur.x, cy = cur.y;
-
-      // Phase 1: count empty spaces before hitting a peg
       let gapBefore = 0;
       let foundPeg = false;
       while (true) {
-        cx += dx;
-        cy += dy;
+        cx += dx; cy += dy;
         const cell = adjData.posSet.get(`${cx},${cy}`);
-        if (!cell) break; // off the board
-        const occupant = board.get(`${cell.row},${cell.col}`);
-        if (occupant !== null) {
-          foundPeg = true;
-          break;
-        }
+        if (!cell) break;
+        if (board.get(`${cell.row},${cell.col}`) !== null) { foundPeg = true; break; }
         gapBefore++;
       }
-
       if (!foundPeg) continue;
 
-      // Phase 2: N gaps before peg → leave N gaps after peg, then land.
-      // So we need gapBefore + 1 consecutive empty cells after the peg,
-      // landing on the last one. (Standard hop is the N=0 case: 1 empty cell.)
       const needed = gapBefore + 1;
       let emptyCount = 0;
       let landPos = null;
       while (emptyCount < needed) {
-        cx += dx;
-        cy += dy;
+        cx += dx; cy += dy;
         const cell = adjData.posSet.get(`${cx},${cy}`);
         if (!cell) break;
         if (board.get(`${cell.row},${cell.col}`) !== null) break;
         emptyCount++;
-        if (emptyCount === needed) {
-          landPos = cell;
-        }
+        if (emptyCount === needed) landPos = cell;
       }
 
       if (!landPos) continue;
       const landKey = `${landPos.row},${landPos.col}`;
       if (visited.has(landKey)) continue;
-
       visited.add(landKey);
       moves.add(landKey);
-      // Only chain (BFS) when showing all reachable destinations on first move
-      // During mid-chain (hopsOnly), don't queue — just show immediate hops
-      if (!hopsOnly) {
-        queue.push(landPos);
-      }
+      if (!hopsOnly) queue.push(landPos);
     }
   }
 
-  // Filter: don't allow moving back into own home triangle once left
-  // (unless the move stays within home), and don't leave goal triangle once entered
   const playerIdx = currentPlayerIdx;
   const player = players[playerIdx];
   const homeTriKeys = new Set(boardData.triangles[player.triangleIndex].map(p => `${p.row},${p.col}`));
@@ -1067,13 +1543,10 @@ function getValidMoves(pos, hopsOnly) {
 
   const filtered = new Set();
   for (const mk of moves) {
-    // If peg is in goal triangle, it can't leave
     if (pegInGoal && !goalTriKeys.has(mk)) continue;
-    // If peg has left home, it can't re-enter home
     if (!pegInHome && homeTriKeys.has(mk)) continue;
     filtered.add(mk);
   }
-
   return filtered;
 }
 
@@ -1084,22 +1557,19 @@ function checkWin(playerIdx) {
 }
 
 function advanceTurn() {
-  // Check win for current player
   if (checkWin(currentPlayerIdx)) {
     players[currentPlayerIdx].finished = true;
     finishOrder.push(currentPlayerIdx);
     players[currentPlayerIdx].finishPlace = finishOrder.length;
-
-    // Check if game is over (all but one finished)
     const unfinished = players.filter(p => !p.finished);
     if (unfinished.length <= 1) {
       gameOver = true;
       showWinScreen();
+      if (networkMode === 'host') broadcastStateUpdate();
       return;
     }
   }
 
-  // Move to next unfinished player
   do {
     currentPlayerIdx = (currentPlayerIdx + 1) % players.length;
   } while (players[currentPlayerIdx].finished);
@@ -1115,10 +1585,14 @@ function advanceTurn() {
 }
 
 function endTurn() {
-  if (isHopping) {
-    isHopping = false;
-    advanceTurn();
+  if (!isHopping) return;
+  if (networkMode === 'client') {
+    sendToHost({ type: 'end-turn-action', playerIndex: myPlayerIndex });
+    return;
   }
+  isHopping = false;
+  advanceTurn();
+  if (networkMode === 'host') broadcastStateUpdate();
 }
 
 // ============================================================
@@ -1126,6 +1600,7 @@ function endTurn() {
 // ============================================================
 canvas.addEventListener('click', (e) => {
   if (gameOver) return;
+  if (!isMyTurn()) return;
 
   const rect = canvas.getBoundingClientRect();
   const mx = e.clientX - rect.left;
@@ -1136,50 +1611,65 @@ canvas.addEventListener('click', (e) => {
   const key = `${pos.row},${pos.col}`;
   const occupant = board.get(key);
 
+  // Online client: send moves to host for validation
+  if (networkMode === 'client') {
+    if (isHopping) {
+      if (validMoves.has(key)) {
+        sendToHost({ type: 'move-action', playerIndex: myPlayerIndex, from: { row: selectedPeg.row, col: selectedPeg.col }, to: { row: pos.row, col: pos.col } });
+      } else {
+        showInvalidFlash(pos);
+      }
+    } else if (occupant === currentPlayerIdx) {
+      selectedPeg = pos;
+      validMoves = getValidMoves(pos, false);
+      render();
+    } else if (selectedPeg && validMoves.has(key)) {
+      sendToHost({ type: 'move-action', playerIndex: myPlayerIndex, from: { row: selectedPeg.row, col: selectedPeg.col }, to: { row: pos.row, col: pos.col } });
+    } else if (selectedPeg && occupant !== currentPlayerIdx) {
+      showInvalidFlash(pos);
+    } else {
+      selectedPeg = null;
+      validMoves = new Set();
+      render();
+    }
+    return;
+  }
+
+  // Local or host: execute moves directly
   if (isHopping) {
-    // Mid-chain: can only click valid hop destinations or end turn
     if (validMoves.has(key)) {
-      // Execute hop
       const selKey = `${selectedPeg.row},${selectedPeg.col}`;
       board.set(selKey, null);
       board.set(key, currentPlayerIdx);
       selectedPeg = pos;
-
-      // Check for more hops
       const nextMoves = getValidMoves(pos, true);
       if (nextMoves.size > 0) {
         validMoves = nextMoves;
         render();
       } else {
-        // No more hops, auto-end turn
         validMoves = new Set();
         render();
-        setTimeout(() => advanceTurn(), 200);
+        setTimeout(() => { advanceTurn(); if (networkMode === 'host') broadcastStateUpdate(); }, 200);
       }
+      if (networkMode === 'host') broadcastStateUpdate();
     } else {
-      // Invalid hop destination — show red flash
       showInvalidFlash(pos);
     }
     return;
   }
 
   if (occupant === currentPlayerIdx) {
-    // Select this peg
     selectedPeg = pos;
     validMoves = getValidMoves(pos, false);
     render();
   } else if (selectedPeg && validMoves.has(key)) {
-    // Save snapshot before first move of the turn
     if (!turnMoved) {
       saveTurnSnapshot();
       turnMoved = true;
       document.getElementById('undo-btn').disabled = false;
     }
 
-    // Move the peg
     const selKey = `${selectedPeg.row},${selectedPeg.col}`;
-
-    // Determine if this was a hop (distance > 1 step)
     const neighbors = adjData.adj.get(selKey) || [];
     const isStep = neighbors.some(n => n.row === pos.row && n.col === pos.col);
 
@@ -1187,13 +1677,12 @@ canvas.addEventListener('click', (e) => {
     board.set(key, currentPlayerIdx);
 
     if (isStep) {
-      // Single step: turn ends
       selectedPeg = null;
       validMoves = new Set();
       render();
-      setTimeout(() => advanceTurn(), 200);
+      setTimeout(() => { advanceTurn(); if (networkMode === 'host') broadcastStateUpdate(); }, 200);
+      if (networkMode === 'host') broadcastStateUpdate();
     } else {
-      // Hop: check for chain
       selectedPeg = pos;
       const nextMoves = getValidMoves(pos, true);
       if (nextMoves.size > 0) {
@@ -1205,16 +1694,14 @@ canvas.addEventListener('click', (e) => {
         selectedPeg = null;
         validMoves = new Set();
         render();
-        setTimeout(() => advanceTurn(), 200);
+        setTimeout(() => { advanceTurn(); if (networkMode === 'host') broadcastStateUpdate(); }, 200);
       }
+      if (networkMode === 'host') broadcastStateUpdate();
     }
   } else {
-    // Invalid move or deselect
     if (selectedPeg && occupant !== currentPlayerIdx) {
-      // Clicked an invalid destination — show red flash
       showInvalidFlash(pos);
     } else {
-      // Clicked empty with no selection, or non-current peg — deselect
       selectedPeg = null;
       validMoves = new Set();
       render();
@@ -1230,7 +1717,6 @@ canvas.addEventListener('mousemove', (e) => {
   const pos = pixelToPos(mx, my);
   const prev = hoveredPos;
   hoveredPos = pos;
-  // Only re-render if hovered cell changed
   if ((!prev && pos) || (prev && !pos) ||
       (prev && pos && (prev.row !== pos.row || prev.col !== pos.col))) {
     render();
@@ -1245,7 +1731,6 @@ canvas.addEventListener('mouseleave', () => {
 function showInvalidFlash(pos) {
   invalidFlash = { row: pos.row, col: pos.col, time: Date.now() };
   render();
-  // Animate the flash fading out
   let frame;
   const animate = () => {
     if (!invalidFlash) return;
@@ -1264,6 +1749,15 @@ function toggleHelp() {
   document.getElementById('help-overlay').classList.toggle('show');
 }
 
+function copyRoomCode() {
+  if (!roomCode) return;
+  navigator.clipboard.writeText(roomCode).then(() => {
+    const toast = document.getElementById('copy-toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 1500);
+  });
+}
+
 // ============================================================
 // UI Updates
 // ============================================================
@@ -1271,16 +1765,27 @@ function updateUI() {
   const player = players[currentPlayerIdx];
   const dot = document.querySelector('#turn-indicator .dot');
   dot.style.background = player.color;
-  document.getElementById('turn-name').textContent = `${player.name}'s turn`;
 
-  // Players bar
+  let turnText = `${player.name}'s turn`;
+  if (networkMode && myPlayerIndex === currentPlayerIdx) {
+    turnText = `Your turn (${player.name})`;
+  } else if (networkMode && myPlayerIndex !== currentPlayerIdx) {
+    turnText = `${player.name}'s turn — waiting...`;
+  }
+  document.getElementById('turn-name').textContent = turnText;
+
   const bar = document.getElementById('players-bar');
   bar.innerHTML = '';
   players.forEach((p, i) => {
     const div = document.createElement('div');
-    div.className = 'pbar-item' + (i === currentPlayerIdx ? ' active' : '') + (p.finished ? ' won' : '');
+    let cls = 'pbar-item';
+    if (i === currentPlayerIdx) cls += ' active';
+    if (p.finished) cls += ' won';
+    if (networkMode && i === myPlayerIndex) cls += ' me';
+    div.className = cls;
+    const youTag = (networkMode && i === myPlayerIndex) ? ' (You)' : '';
     div.innerHTML = `<span class="pdot" style="background:${p.color}"></span>
-      <span>${p.name}${p.finished ? ' ✓' : ''}</span>`;
+      <span>${p.name}${youTag}${p.finished ? ' ✓' : ''}</span>`;
     bar.appendChild(div);
   });
 }
@@ -1302,15 +1807,15 @@ function showWinScreen() {
 // Init
 // ============================================================
 window.addEventListener('resize', () => {
-  if (document.getElementById('game-screen').style.display !== 'none') {
+  if (boardData && document.getElementById('game-screen').style.display !== 'none') {
     resizeCanvas();
     render();
   }
 });
 
+selectMode('local');
 selectCount(2);
 
-// Register service worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
 }
