@@ -1,6 +1,6 @@
 {
   "name": "Chinese Checkers",
-  "short_name": "Checkers",
+  "short_name": "Chinese Checkers",
   "description": "Classic Chinese Checkers board game for 2-6 players.",
   "start_url": "/chinese-checkers/",
   "scope": "/chinese-checkers/",
