@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="64" fill="#1a1a2e"/>
+  <!-- Star shape hint with 6 colored pegs -->
+  <circle cx="256" cy="120" r="32" fill="#e84855"/>
+  <circle cx="374" cy="188" r="32" fill="#3185fc"/>
+  <circle cx="374" cy="324" r="32" fill="#44c767"/>
+  <circle cx="256" cy="392" r="32" fill="#f5a623"/>
+  <circle cx="138" cy="324" r="32" fill="#a855f7"/>
+  <circle cx="138" cy="188" r="32" fill="#22d3ee"/>
+  <!-- Center peg -->
+  <circle cx="256" cy="256" r="28" fill="#555" stroke="#777" stroke-width="3"/>
+</svg>

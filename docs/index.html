@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1a1a2e">
 <title>Chinese Checkers</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="manifest" href="manifest.webmanifest">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -216,6 +219,71 @@
     font-weight: 600;
     cursor: pointer;
   }
+
+  /* Help overlay */
+  #help-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  #help-overlay.show { display: flex; }
+  #help-box {
+    background: #2a2a4a;
+    border-radius: 16px;
+    padding: 28px 32px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    position: relative;
+  }
+  #help-box h2 {
+    font-size: 1.4rem;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  #help-box h3 {
+    font-size: 1rem;
+    color: #b0b0d0;
+    margin: 14px 0 6px;
+  }
+  #help-box p, #help-box li {
+    font-size: 0.9rem;
+    color: #bbb;
+    line-height: 1.5;
+  }
+  #help-box ul {
+    padding-left: 20px;
+    margin: 4px 0;
+  }
+  #help-box li { margin-bottom: 4px; }
+  #help-box .help-close {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 1.4rem;
+    cursor: pointer;
+    line-height: 1;
+  }
+  #help-box .help-close:hover { color: #fff; }
+  .help-diagram {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: #8b8bbb;
+    background: #1a1a2e;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 6px 0 10px;
+    line-height: 1.6;
+  }
 </style>
 </head>
 <body>
@@ -232,13 +300,15 @@
   </div>
   <div id="player-inputs"></div>
   <button id="start-btn" onclick="startGame()">Start Game</button>
+  <button style="margin-top:8px;padding:8px 24px;border-radius:8px;border:1px solid #555;background:#2a2a4a;color:#ccc;cursor:pointer;font-size:0.9rem;" onclick="toggleHelp()">Rules</button>
 </div>
 
 <!-- Game Screen -->
 <div id="game-screen">
   <div id="top-bar">
     <div id="turn-indicator"><span class="dot"></span><span id="turn-name"></span></div>
-    <div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="toggleHelp()">Rules</button>
       <button onclick="restartGame()">New Game</button>
     </div>
   </div>
@@ -255,6 +325,49 @@
     <h2 id="win-title">Player Wins!</h2>
     <p id="win-sub">Congratulations!</p>
     <button onclick="restartGame()">Play Again</button>
+  </div>
+</div>
+
+<!-- Help Overlay -->
+<div id="help-overlay" onclick="if(event.target===this)toggleHelp()">
+  <div id="help-box">
+    <button class="help-close" onclick="toggleHelp()">&times;</button>
+    <h2>How to Play</h2>
+
+    <h3>Objective</h3>
+    <p>Move all 10 of your pegs from your starting triangle to the opposite triangle across the board. The first player to do so wins.</p>
+
+    <h3>Taking a Turn</h3>
+    <ul>
+      <li>Click one of your pegs to select it, then click a destination cell to move.</li>
+      <li>You can make a <strong>single step</strong> to any adjacent empty cell.</li>
+      <li>Or you can <strong>hop</strong> over another peg to land on the other side.</li>
+    </ul>
+
+    <h3>Standard Hop</h3>
+    <p>Jump over an adjacent peg (any color) and land on the empty cell directly beyond it. No pegs are captured.</p>
+    <div class="help-diagram">
+      You &bull; Peg &bull; Land here
+    </div>
+
+    <h3>Long Hop</h3>
+    <p>If there are N empty spaces between your peg and another peg in a straight line, you can hop over it and land N+1 spaces past it (leaving the same N-space gap on the other side).</p>
+    <div class="help-diagram">
+      You &bull; _ &bull; Peg &bull; _ &bull; Land here<br>
+      You &bull; _ &bull; _ &bull; Peg &bull; _ &bull; _ &bull; Land here
+    </div>
+
+    <h3>Chain Hops</h3>
+    <p>After a hop, you may continue hopping from the new position (standard or long hops). Click "End Turn" when done, or the turn auto-ends if no more hops are available. You cannot mix a single step with hops.</p>
+
+    <h3>Restrictions</h3>
+    <ul>
+      <li>A peg that has left its home triangle cannot re-enter it.</li>
+      <li>A peg that has entered the goal triangle cannot leave it.</li>
+    </ul>
+
+    <h3>Players</h3>
+    <p>Supports 2, 3, 4, or 6 players sharing the same device, taking turns in order.</p>
   </div>
 </div>
 
@@ -1111,6 +1224,10 @@ function showInvalidFlash(pos) {
   frame = requestAnimationFrame(animate);
 }
 
+function toggleHelp() {
+  document.getElementById('help-overlay').classList.toggle('show');
+}
+
 // ============================================================
 // UI Updates
 // ============================================================
@@ -1156,6 +1273,11 @@ window.addEventListener('resize', () => {
 });
 
 selectCount(2);
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
 </script>
 </body>
 </html>
