@@ -607,12 +607,6 @@
     <h3>Chain Hops</h3>
     <p>After a hop, you may continue hopping from the new position (standard or long hops). Click "End Turn" when done, or the turn auto-ends if no more hops are available. You cannot mix a single step with hops.</p>
 
-    <h3>Restrictions</h3>
-    <ul>
-      <li>A peg that has left its home triangle cannot re-enter it.</li>
-      <li>A peg that has entered the goal triangle cannot leave it.</li>
-    </ul>
-
     <h3>Players</h3>
     <p>Supports 2, 3, 4, or 6 players. Play locally on the same device, or online with friends using a room code.</p>
   </div>
@@ -1534,20 +1528,7 @@ function getValidMoves(pos, hopsOnly) {
     }
   }
 
-  const playerIdx = currentPlayerIdx;
-  const player = players[playerIdx];
-  const homeTriKeys = new Set(boardData.triangles[player.triangleIndex].map(p => `${p.row},${p.col}`));
-  const goalTriKeys = new Set(boardData.triangles[player.goalTriangleIndex].map(p => `${p.row},${p.col}`));
-  const pegInHome = homeTriKeys.has(key);
-  const pegInGoal = goalTriKeys.has(key);
-
-  const filtered = new Set();
-  for (const mk of moves) {
-    if (pegInGoal && !goalTriKeys.has(mk)) continue;
-    if (!pegInHome && homeTriKeys.has(mk)) continue;
-    filtered.add(mk);
-  }
-  return filtered;
+  return moves;
 }
 
 function checkWin(playerIdx) {
