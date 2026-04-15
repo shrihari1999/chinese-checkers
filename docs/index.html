@@ -1096,6 +1096,7 @@ function applyGameStart(data) {
   boardData = buildBoard();
   adjData = buildAdjacency(boardData.positions);
   players = data.players;
+  viewRotation = rotationForTriangle(players[myPlayerIndex].triangleIndex);
   board = new Map(data.board);
   currentPlayerIdx = 0;
   selectedPeg = null;
@@ -1161,6 +1162,8 @@ function startOnlineGame() {
     finishPlace: -1
   }));
 
+  viewRotation = rotationForTriangle(players[myPlayerIndex].triangleIndex);
+
   boardData = buildBoard();
   adjData = buildAdjacency(boardData.positions);
   initBoard();
@@ -1200,6 +1203,12 @@ function cleanupNetwork() {
   myPlayerIndex = null;
   roomCode = null;
   lobbyPlayers = [];
+  viewRotation = 0;
+}
+
+function rotationForTriangle(triangleIndex) {
+  // Rotate so the player's home triangle lands at the bottom (where triangle 3 sits by default).
+  return (((3 - triangleIndex) % 6) + 6) % 6 * (Math.PI / 3);
 }
 
 function sendToHost(data) {
@@ -1217,6 +1226,7 @@ function isMyTurn() {
 function startGame() {
   if (networkMode) return; // online uses startOnlineGame
 
+  viewRotation = 0;
   const triIndices = PLAYER_CONFIGS[selectedCount];
   players = triIndices.map((tri, i) => {
     const input = document.getElementById(`pname-${i}`);
@@ -1310,6 +1320,7 @@ const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 let cellSize = 24;
 let offsetX = 0, offsetY = 0;
+let viewRotation = 0; // radians, clockwise; rotates the board so the local player's home sits at the bottom in online mode
 
 function resizeCanvas() {
   const maxW = Math.min(window.innerWidth - 20, 700);
@@ -1334,9 +1345,16 @@ function resizeCanvas() {
 }
 
 function posToPixel(pos) {
-  const px = offsetX + pos.x * cellSize;
-  const py = offsetY + pos.y * cellSize * (Math.sqrt(3) / 2);
-  return { px, py };
+  const rowScale = cellSize * (Math.sqrt(3) / 2);
+  const centerY = offsetY + 8 * rowScale;
+  const dx = pos.x * cellSize;
+  const dy = (pos.y - 8) * rowScale;
+  if (viewRotation) {
+    const c = Math.cos(viewRotation);
+    const s = Math.sin(viewRotation);
+    return { px: offsetX + dx * c - dy * s, py: centerY + dx * s + dy * c };
+  }
+  return { px: offsetX + dx, py: centerY + dy };
 }
 
 function pixelToPos(mx, my) {
