@@ -490,6 +490,7 @@
       <button onclick="selectCount(2)" id="btn-2">2</button>
       <button onclick="selectCount(3)" id="btn-3">3</button>
       <button onclick="selectCount(4)" id="btn-4">4</button>
+      <button onclick="selectCount(5)" id="btn-5">5</button>
       <button onclick="selectCount(6)" id="btn-6">6</button>
     </div>
     <div id="player-inputs" style="margin-top:16px;"></div>
@@ -509,6 +510,7 @@
         <button onclick="hostSelectCount(2)" id="hbtn-2">2</button>
         <button onclick="hostSelectCount(3)" id="hbtn-3">3</button>
         <button onclick="hostSelectCount(4)" id="hbtn-4">4</button>
+        <button onclick="hostSelectCount(5)" id="hbtn-5">5</button>
         <button onclick="hostSelectCount(6)" id="hbtn-6">6</button>
       </div>
       <input type="text" id="host-name-input" placeholder="Your name" maxlength="20" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid #444;background:#2a2a4a;color:#eee;font-size:0.95rem;outline:none;text-align:center;">
@@ -625,6 +627,7 @@ const PLAYER_CONFIGS = {
   2: [0, 3],
   3: [0, 2, 4],
   4: [0, 1, 3, 4],
+  5: [0, 1, 2, 3, 4],
   6: [0, 1, 2, 3, 4, 5]
 };
 
