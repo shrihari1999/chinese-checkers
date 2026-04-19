@@ -819,7 +819,7 @@ function createRoom() {
 
   myClientId = 'host-' + roomCode + '-' + Math.random().toString(36).slice(2, 8);
   ably = new Ably.Realtime({ key: ABLY_KEY, clientId: myClientId });
-  channel = ably.channels.get('cc-' + roomCode);
+  channel = ably.channels.get('cc:' + roomCode);
 
   ably.connection.on('failed', (stateChange) => {
     const msg = stateChange && stateChange.reason ? stateChange.reason.message : 'unknown';
@@ -1030,6 +1030,7 @@ function showJoinRoom() {
   document.getElementById('lobby-panel').classList.remove('show');
   document.getElementById('client-wait-panel').classList.remove('show');
   document.getElementById('join-status').textContent = '';
+  setTimeout(() => document.getElementById('join-room-input').focus(), 0);
 }
 
 function joinRoom() {
@@ -1050,7 +1051,7 @@ function joinRoom() {
 
   myClientId = 'client-' + Math.random().toString(36).slice(2, 10);
   ably = new Ably.Realtime({ key: ABLY_KEY, clientId: myClientId });
-  channel = ably.channels.get('cc-' + code);
+  channel = ably.channels.get('cc:' + code);
 
   joinTimeoutId = setTimeout(() => {
     document.getElementById('join-status').textContent = 'No response from host. Check the room code or try again.';
