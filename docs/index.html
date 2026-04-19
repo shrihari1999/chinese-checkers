@@ -7,7 +7,7 @@
 <title>Chinese Checkers</title>
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="manifest" href="manifest.webmanifest">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -717,14 +717,20 @@ let turnMoved = false;
 // ============================================================
 // Network State
 // ============================================================
+// Replace this with your Ably API key from https://ably.com (Dashboard → API Keys).
+// For better security, use a key restricted to capability {"cc-*":["publish","subscribe","presence"]}.
+const ABLY_KEY = 'LH3K3w.YvK3iw:i8S4K4lbabeFjKZNMRiZ39rwRhia1_VCkSa2plYPkSM';
+
 let networkMode = null;    // null = local, 'host', 'client'
-let peer = null;
-let connections = [];      // host: DataConnections to clients
-let hostConnection = null; // client: DataConnection to host
+let ably = null;
+let channel = null;
+let myClientId = null;
+let clientSlots = new Map(); // host-only: Ably clientId -> lobby slot index
 let myPlayerIndex = null;  // which player index this device controls (online only)
 let roomCode = null;
 let lobbyPlayers = [];     // host lobby: [{name, connected}]
 let hostPlayerCount = 2;
+let joinTimeoutId = null;  // client-only: pending "slot-assigned" timeout
 
 // ============================================================
 // Setup Screen Logic
@@ -794,6 +800,7 @@ function createRoom() {
   roomCode = generateRoomCode();
   networkMode = 'host';
   myPlayerIndex = 0;
+  clientSlots.clear();
 
   const triIndices = PLAYER_CONFIGS[hostPlayerCount];
   lobbyPlayers = triIndices.map((tri, i) => ({
@@ -806,58 +813,79 @@ function createRoom() {
   document.getElementById('create-room-panel').classList.remove('show');
   document.getElementById('lobby-panel').classList.add('show');
   document.getElementById('room-code-display').textContent = roomCode;
+  document.getElementById('lobby-status').textContent = 'Connecting...';
+  document.getElementById('lobby-status').className = 'status-text';
   updateLobbyUI();
 
-  // Create PeerJS peer
-  peer = new Peer('cc-' + roomCode);
-  peer.on('open', () => {
-    document.getElementById('lobby-status').textContent = 'Waiting for players to join...';
-  });
-  peer.on('error', (err) => {
-    document.getElementById('lobby-status').textContent = 'Connection error: ' + err.type;
+  myClientId = 'host-' + roomCode + '-' + Math.random().toString(36).slice(2, 8);
+  ably = new Ably.Realtime({ key: ABLY_KEY, clientId: myClientId });
+  channel = ably.channels.get('cc-' + roomCode);
+
+  ably.connection.on('failed', (stateChange) => {
+    const msg = stateChange && stateChange.reason ? stateChange.reason.message : 'unknown';
+    document.getElementById('lobby-status').textContent = 'Connection failed: ' + msg;
     document.getElementById('lobby-status').className = 'status-text error-text';
   });
-  peer.on('connection', (conn) => {
-    conn.on('open', () => {
-      conn.on('data', (data) => handleHostMessage(conn, data));
-      conn.on('close', () => handleClientDisconnect(conn));
-    });
+
+  channel.presence.subscribe('enter', (member) => {
+    if (member.data && member.data.role === 'client') {
+      handleClientJoined(member.clientId, member.data.name);
+    }
   });
+  channel.presence.subscribe('leave', (member) => {
+    handleClientLeft(member.clientId);
+  });
+  channel.subscribe('to-host', (msg) => {
+    handleHostMessage(msg.clientId, msg.data);
+  });
+
+  channel.attach()
+    .then(() => channel.presence.enter({ role: 'host', name: hostName }))
+    .then(() => {
+      document.getElementById('lobby-status').textContent = 'Waiting for players to join...';
+    })
+    .catch((err) => {
+      document.getElementById('lobby-status').textContent = 'Connection error: ' + (err && err.message ? err.message : 'unknown');
+      document.getElementById('lobby-status').className = 'status-text error-text';
+    });
 }
 
-function handleHostMessage(conn, data) {
-  if (data.type === 'join') {
-    // Assign next available slot
-    const slotIdx = lobbyPlayers.findIndex(s => !s.connected && s.name === null);
-    if (slotIdx === -1) {
-      conn.send({ type: 'error', message: 'Room is full' });
-      return;
-    }
-    lobbyPlayers[slotIdx].name = data.name;
-    lobbyPlayers[slotIdx].connected = true;
-    conn._playerIndex = slotIdx;
-    connections.push(conn);
+function handleClientJoined(clientId, name) {
+  if (clientSlots.has(clientId)) return;
+  const slotIdx = lobbyPlayers.findIndex(s => !s.connected && s.name === null);
+  if (slotIdx === -1) {
+    channel.publish('direct', { targetId: clientId, payload: { type: 'error', message: 'Room is full' } });
+    return;
+  }
+  lobbyPlayers[slotIdx].name = name || 'Player';
+  lobbyPlayers[slotIdx].connected = true;
+  clientSlots.set(clientId, slotIdx);
 
-    conn.send({
+  channel.publish('direct', {
+    targetId: clientId,
+    payload: {
       type: 'slot-assigned',
       playerIndex: slotIdx,
       triangleIndex: lobbyPlayers[slotIdx].triangleIndex,
       color: COLORS[lobbyPlayers[slotIdx].triangleIndex],
       colorName: COLOR_NAMES[lobbyPlayers[slotIdx].triangleIndex]
-    });
-
-    updateLobbyUI();
-    broadcastLobbyUpdate();
-
-    // Auto-start when all slots filled
-    const allFilled = lobbyPlayers.every(s => s.connected);
-    if (allFilled) {
-      document.getElementById('start-btn').style.display = 'block';
-      document.getElementById('start-btn').disabled = false;
-      document.getElementById('lobby-status').textContent = 'All players joined! Starting...';
-      setTimeout(() => startOnlineGame(), 500);
     }
-  } else if (data.type === 'move-action') {
+  });
+
+  updateLobbyUI();
+  broadcastLobbyUpdate();
+
+  const allFilled = lobbyPlayers.every(s => s.connected);
+  if (allFilled) {
+    document.getElementById('start-btn').style.display = 'block';
+    document.getElementById('start-btn').disabled = false;
+    document.getElementById('lobby-status').textContent = 'All players joined! Starting...';
+    setTimeout(() => startOnlineGame(), 500);
+  }
+}
+
+function handleHostMessage(fromClientId, data) {
+  if (data.type === 'move-action') {
     handleRemoteMove(data);
   } else if (data.type === 'end-turn-action') {
     if (data.playerIndex === currentPlayerIdx && isHopping) {
@@ -943,30 +971,29 @@ function handleRemoteMove(data) {
   }
 }
 
-function handleClientDisconnect(conn) {
-  const idx = conn._playerIndex;
-  if (idx !== undefined && lobbyPlayers[idx]) {
-    const name = lobbyPlayers[idx].name;
-    // During game
-    if (document.getElementById('game-screen').style.display === 'flex') {
-      document.getElementById('disconnect-title').textContent = 'Player Disconnected';
-      document.getElementById('disconnect-msg').textContent = `${name} has disconnected.`;
-      document.getElementById('disconnect-overlay').classList.add('show');
-    }
+function handleClientLeft(clientId) {
+  const slotIdx = clientSlots.get(clientId);
+  if (slotIdx === undefined) return;
+  clientSlots.delete(clientId);
+  const name = lobbyPlayers[slotIdx] ? lobbyPlayers[slotIdx].name : null;
+  if (document.getElementById('game-screen').style.display === 'flex') {
+    document.getElementById('disconnect-title').textContent = 'Player Disconnected';
+    document.getElementById('disconnect-msg').textContent = `${name || 'Player'} has disconnected.`;
+    document.getElementById('disconnect-overlay').classList.add('show');
   }
-  connections = connections.filter(c => c !== conn);
 }
 
 function broadcastLobbyUpdate() {
-  const data = {
+  if (!channel) return;
+  channel.publish('broadcast', {
     type: 'lobby-update',
     players: lobbyPlayers.map(s => ({ name: s.name, triangleIndex: s.triangleIndex, connected: s.connected }))
-  };
-  connections.forEach(c => c.send(data));
+  });
 }
 
 function broadcastStateUpdate() {
-  const data = {
+  if (!channel) return;
+  channel.publish('broadcast', {
     type: 'state-update',
     board: Array.from(board.entries()),
     currentPlayerIdx,
@@ -977,8 +1004,7 @@ function broadcastStateUpdate() {
     players: players.map(p => ({ name: p.name, color: p.color, colorName: p.colorName, triangleIndex: p.triangleIndex, goalTriangleIndex: p.goalTriangleIndex, finished: p.finished, finishPlace: p.finishPlace })),
     turnSnapshot: turnSnapshot ? { board: Array.from(turnSnapshot.board.entries()), playerIdx: turnSnapshot.playerIdx } : null,
     turnMoved
-  };
-  connections.forEach(c => c.send(data));
+  });
 }
 
 function updateLobbyUI() {
@@ -1020,53 +1046,81 @@ function joinRoom() {
   document.getElementById('join-status').className = 'status-text';
 
   networkMode = 'client';
-  peer = new Peer();
-  peer.on('open', () => {
-    hostConnection = peer.connect('cc-' + code);
-    const timeout = setTimeout(() => {
-      document.getElementById('join-status').textContent = 'Could not connect. Check room code.';
+  roomCode = code;
+
+  myClientId = 'client-' + Math.random().toString(36).slice(2, 10);
+  ably = new Ably.Realtime({ key: ABLY_KEY, clientId: myClientId });
+  channel = ably.channels.get('cc-' + code);
+
+  joinTimeoutId = setTimeout(() => {
+    document.getElementById('join-status').textContent = 'No response from host. Check the room code or try again.';
+    document.getElementById('join-status').className = 'status-text error-text';
+    document.getElementById('join-btn').disabled = false;
+    cleanupNetwork();
+  }, 15000);
+
+  ably.connection.on('failed', (stateChange) => {
+    if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
+    const msg = stateChange && stateChange.reason ? stateChange.reason.message : 'unknown';
+    document.getElementById('join-status').textContent = 'Connection failed: ' + msg;
+    document.getElementById('join-status').className = 'status-text error-text';
+    document.getElementById('join-btn').disabled = false;
+    cleanupNetwork();
+  });
+
+  channel.subscribe('broadcast', (msg) => handleClientMessage(msg.data));
+  channel.subscribe('direct', (msg) => {
+    if (!msg.data || msg.data.targetId !== myClientId) return;
+    handleClientMessage(msg.data.payload);
+  });
+  channel.presence.subscribe('leave', (member) => {
+    if (member.data && member.data.role === 'host') {
+      if (document.getElementById('game-screen').style.display === 'flex') {
+        document.getElementById('disconnect-title').textContent = 'Disconnected';
+        document.getElementById('disconnect-msg').textContent = 'Lost connection to the host.';
+        document.getElementById('disconnect-overlay').classList.add('show');
+      } else {
+        if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
+        document.getElementById('join-status').textContent = 'Host disconnected.';
+        document.getElementById('join-status').className = 'status-text error-text';
+        document.getElementById('join-btn').disabled = false;
+      }
+    }
+  });
+
+  channel.attach()
+    .then(() => channel.presence.get())
+    .then((members) => {
+      const host = members.find(m => m.data && m.data.role === 'host');
+      if (!host) {
+        if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
+        document.getElementById('join-status').textContent = 'No room with that code (or host is offline).';
+        document.getElementById('join-status').className = 'status-text error-text';
+        document.getElementById('join-btn').disabled = false;
+        cleanupNetwork();
+        return;
+      }
+      return channel.presence.enter({ role: 'client', name });
+    })
+    .catch((err) => {
+      if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
+      document.getElementById('join-status').textContent = 'Error: ' + (err && err.message ? err.message : 'unknown');
       document.getElementById('join-status').className = 'status-text error-text';
       document.getElementById('join-btn').disabled = false;
       cleanupNetwork();
-    }, 8000);
-
-    hostConnection.on('open', () => {
-      clearTimeout(timeout);
-      hostConnection.send({ type: 'join', name });
-      hostConnection.on('data', (data) => handleClientMessage(data));
-      hostConnection.on('close', () => {
-        if (document.getElementById('game-screen').style.display === 'flex') {
-          document.getElementById('disconnect-title').textContent = 'Disconnected';
-          document.getElementById('disconnect-msg').textContent = 'Lost connection to the host.';
-          document.getElementById('disconnect-overlay').classList.add('show');
-        } else {
-          document.getElementById('join-status').textContent = 'Host disconnected.';
-          document.getElementById('join-status').className = 'status-text error-text';
-          document.getElementById('join-btn').disabled = false;
-        }
-      });
     });
-    hostConnection.on('error', () => {
-      clearTimeout(timeout);
-      document.getElementById('join-status').textContent = 'Connection failed.';
-      document.getElementById('join-status').className = 'status-text error-text';
-      document.getElementById('join-btn').disabled = false;
-    });
-  });
-  peer.on('error', (err) => {
-    document.getElementById('join-status').textContent = 'Error: ' + err.type;
-    document.getElementById('join-status').className = 'status-text error-text';
-    document.getElementById('join-btn').disabled = false;
-  });
 }
 
 function handleClientMessage(data) {
+  if (!data) return;
   if (data.type === 'error') {
+    if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
     document.getElementById('join-status').textContent = data.message;
     document.getElementById('join-status').className = 'status-text error-text';
     document.getElementById('join-btn').disabled = false;
     cleanupNetwork();
   } else if (data.type === 'slot-assigned') {
+    if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
     myPlayerIndex = data.playerIndex;
     roomCode = document.getElementById('join-room-input').value.trim().toUpperCase();
     // Show waiting panel
@@ -1177,12 +1231,13 @@ function startOnlineGame() {
   turnSnapshot = null;
 
   // Broadcast game start
-  const startData = {
-    type: 'game-start',
-    players: players.map(p => ({ name: p.name, color: p.color, colorName: p.colorName, triangleIndex: p.triangleIndex, goalTriangleIndex: p.goalTriangleIndex, finished: p.finished, finishPlace: p.finishPlace })),
-    board: Array.from(board.entries())
-  };
-  connections.forEach(c => c.send(startData));
+  if (channel) {
+    channel.publish('broadcast', {
+      type: 'game-start',
+      players: players.map(p => ({ name: p.name, color: p.color, colorName: p.colorName, triangleIndex: p.triangleIndex, goalTriangleIndex: p.goalTriangleIndex, finished: p.finished, finishPlace: p.finishPlace })),
+      board: Array.from(board.entries())
+    });
+  }
 
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('game-screen').style.display = 'flex';
@@ -1196,11 +1251,21 @@ function startOnlineGame() {
 // Network Helpers
 // ============================================================
 function cleanupNetwork() {
-  if (peer) { peer.destroy(); peer = null; }
-  connections = [];
-  hostConnection = null;
+  if (joinTimeoutId) { clearTimeout(joinTimeoutId); joinTimeoutId = null; }
+  if (channel) {
+    try { channel.presence.unsubscribe(); } catch (e) {}
+    try { channel.unsubscribe(); } catch (e) {}
+    try { channel.detach(); } catch (e) {}
+    channel = null;
+  }
+  if (ably) {
+    try { ably.close(); } catch (e) {}
+    ably = null;
+  }
+  clientSlots.clear();
   networkMode = null;
   myPlayerIndex = null;
+  myClientId = null;
   roomCode = null;
   lobbyPlayers = [];
   viewRotation = 0;
@@ -1212,7 +1277,7 @@ function rotationForTriangle(triangleIndex) {
 }
 
 function sendToHost(data) {
-  if (hostConnection && hostConnection.open) hostConnection.send(data);
+  if (channel) channel.publish('to-host', data);
 }
 
 function isMyTurn() {
